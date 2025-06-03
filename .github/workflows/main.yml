@@ -1,5 +1,6 @@
 name: Build OTX Server 2 - Windows  
-on:   
+  
+on:  
   push:  
     branches: [ main, master ]  
   pull_request:  
@@ -14,50 +15,130 @@ jobs:
         uses: actions/checkout@v4  
           
       - name: Setup MSBuild  
-        uses: microsoft/setup-msbuild@v1.3  
+        uses: microsoft/setup-msbuild@v2  
           
-      - name: Install Boost via vcpkg  
+      - name: Cache vcpkg  
+        uses: actions/cache@v4  
+        with:  
+          path: |  
+            C:\vcpkg\installed  
+            C:\vcpkg\buildtrees  
+            C:\vcpkg\packages  
+          key: ${{ runner.os }}-vcpkg-boost165-${{ hashFiles('**/vcpkg.json') }}  
+          restore-keys: |  
+            ${{ runner.os }}-vcpkg-boost165-  
+              
+      - name: Install dependencies via vcpkg  
         run: |  
-          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
-          C:\vcpkg\bootstrap-vcpkg.bat  
-          C:\vcpkg\vcpkg install boost:x64-windows  
+          if (!(Test-Path "C:\vcpkg")) {  
+            git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
+            C:\vcpkg\bootstrap-vcpkg.bat  
+          }  
+          # Instalar Boost 1.65 (última versão compatível com io_service)  
+          C:\vcpkg\vcpkg install boost:x64-windows@1.65.1 --recurse  
+          # Instalar outras dependências necessárias  
+          C:\vcpkg\vcpkg install libxml2:x64-windows --recurse  
+          C:\vcpkg\vcpkg install sqlite3:x64-windows --recurse  
+          C:\vcpkg\vcpkg install openssl:x64-windows --recurse  
+          C:\vcpkg\vcpkg install lua:x64-windows --recurse  
+          C:\vcpkg\vcpkg install pugixml:x64-windows --recurse  
             
-      - name: Setup Boost directory structure correctly  
+      - name: Setup Boost directory structure  
         run: |  
-          mkdir C:\local\boost_1_84_0 -Force  
-          # Copiar headers do boost para o diretório raiz esperado  
-          xcopy /E /I "C:\vcpkg\installed\x64-windows\include\*" "C:\local\boost_1_84_0\"  
-          # Copiar bibliotecas para o subdiretório esperado  
-          mkdir "C:\local\boost_1_84_0\lib64-msvc-14.3" -Force  
-          xcopy /E /I "C:\vcpkg\installed\x64-windows\lib\*" "C:\local\boost_1_84_0\lib64-msvc-14.3\"  
+          mkdir C:\local\boost_1_65_1 -Force  
+          # Copiar headers do boost  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\include\*" "C:\local\boost_1_65_1\"  
+          # Copiar bibliotecas  
+          mkdir "C:\local\boost_1_65_1\lib64-msvc-14.3" -Force  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\lib\*" "C:\local\boost_1_65_1\lib64-msvc-14.3\"  
             
-      - name: Verify Boost installation  
+      - name: Verify dependencies installation  
         run: |  
-          if (!(Test-Path "C:\local\boost_1_84_0\boost\config.hpp")) {  
-            Write-Error "Boost headers not found at expected location"  
+          # Verificar Boost  
+          if (!(Test-Path "C:\local\boost_1_65_1\boost\config.hpp")) {  
+            Write-Error "Boost headers not found"  
             exit 1  
           }  
-          Write-Host "Boost installation verified successfully"  
+          Write-Host "✓ Boost 1.65 installation verified"  
             
-      - name: Verify SDK and create missing directories  
-        run: |  
-          if (!(Test-Path "sources\otx-windows-sdk\lua\lib64")) {  
-            Write-Host "Creating missing lib64 directories..."  
-            mkdir sources\otx-windows-sdk\lua\lib64 -Force  
-            mkdir sources\otx-windows-sdk\libxml2\lib64 -Force  
-            mkdir sources\otx-windows-sdk\sqlite3\lib64 -Force  
-            mkdir sources\otx-windows-sdk\openssl\lib64 -Force  
-            mkdir sources\otx-windows-sdk\mysql-connector-c\lib64 -Force  
-            mkdir sources\otx-windows-sdk\mpir\lib64 -Force  
-            mkdir sources\otx-windows-sdk\libiconv\lib64 -Force  
+          # Verificar outras dependências  
+          $deps = @("libxml2", "sqlite3", "openssl", "lua", "pugixml")  
+          foreach ($dep in $deps) {  
+            if (Test-Path "C:\vcpkg\installed\x64-windows\include\$dep*") {  
+              Write-Host "✓ $dep found"  
+            } else {  
+              Write-Warning "⚠ $dep headers may be missing"  
+            }  
           }  
             
-      - name: Build project  
+      - name: Setup SDK directories and copy libraries  
         run: |  
-          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143  
+          # Criar estrutura de diretórios SDK conforme esperado pelo projeto  
+          $sdkDirs = @(  
+            "sources\otx-windows-sdk\lua\lib64",  
+            "sources\otx-windows-sdk\libxml2\lib64",   
+            "sources\otx-windows-sdk\sqlite3\lib64",  
+            "sources\otx-windows-sdk\pugixml",  
+            "sources\otx-windows-sdk\openssl\lib64",  
+            "sources\otx-windows-sdk\mysql-connector-c\lib64",  
+            "sources\otx-windows-sdk\mpir\lib64",  
+            "sources\otx-windows-sdk\libiconv\lib64",  
+            "sources\otx-windows-sdk\lib64-msvc-14.3"  
+          )  
+            
+          foreach ($dir in $sdkDirs) {  
+            if (!(Test-Path $dir)) {  
+              Write-Host "Creating $dir..."  
+              mkdir $dir -Force  
+            }  
+          }  
+            
+          # Copiar bibliotecas do vcpkg para SDK  
+          if (Test-Path "C:\vcpkg\installed\x64-windows\lib") {  
+            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*xml2*" "sources\otx-windows-sdk\libxml2\lib64\" 2>$null  
+            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*sqlite*" "sources\otx-windows-sdk\sqlite3\lib64\" 2>$null  
+            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*ssl*" "sources\otx-windows-sdk\openssl\lib64\" 2>$null  
+            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*lua*" "sources\otx-windows-sdk\lua\lib64\" 2>$null  
+            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*pugi*" "sources\otx-windows-sdk\pugixml\" 2>$null  
+          }  
+            
+      - name: Update project file for Boost 1.65  
+        run: |  
+          # Atualizar referências do Boost no arquivo de projeto  
+          $projectFile = "sources\msvc\TheOTXServer.vcxproj"  
+          if (Test-Path $projectFile) {  
+            (Get-Content $projectFile) -replace 'C:\\local\\boost_1_84_0', 'C:\local\boost_1_65_1' | Set-Content $projectFile  
+            Write-Host "✓ Project file updated for Boost 1.65"  
+          }  
+            
+      - name: Build project with compatibility settings  
+        run: |  
+          msbuild sources/msvc/TheOTXServer.vcxproj `  
+            /p:Configuration=Release `  
+            /p:Platform=x64 `  
+            /p:PlatformToolset=v143 `  
+            /p:PreprocessorDefinitions="BOOST_ASIO_ENABLE_OLD_SERVICES;WIN64;NDEBUG;_CONSOLE" `  
+            /p:VcpkgRoot=C:\vcpkg `  
+            /p:VcpkgTriplet=x64-windows `  
+            /m:2 `  
+            /verbosity:minimal  
+              
+      - name: Verify build output  
+        run: |  
+          if (Test-Path "sources/msvc/x64/Release/TheOTXServer.exe") {  
+            $fileInfo = Get-Item "sources/msvc/x64/Release/TheOTXServer.exe"  
+            Write-Host "✓ Build successful - Size: $($fileInfo.Length) bytes"  
+            Write-Host "✓ Created: $($fileInfo.CreationTime)"  
+          } else {  
+            Write-Error "Build failed - executable not found"  
+            exit 1  
+          }  
             
       - name: Upload artifacts  
         uses: actions/upload-artifact@v4  
         with:  
-          name: otx-server-windows-x64  
-          path: sources/msvc/x64/Release/TheOTXServer.exe
+          name: otx-server-windows-x64-${{ github.sha }}  
+          path: |  
+            sources/msvc/x64/Release/TheOTXServer.exe  
+            sources/msvc/x64/Release/*.dll  
+          retention-days: 30
