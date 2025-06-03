@@ -35,12 +35,36 @@ jobs:
             C:\vcpkg\bootstrap-vcpkg.bat  
           }  
             
-          # Instalar Boost 1.65 (última versão compatível com io_service)  
-          Write-Host "Installing Boost 1.65..."  
-          C:\vcpkg\vcpkg install boost:x64-windows@1.65.1 --recurse  
-          if ($LASTEXITCODE -ne 0) {  
-            Write-Host "Boost 1.65.1 not available, trying 1.64..."  
-            C:\vcpkg\vcpkg install boost:x64-windows@1.64.0 --recurse  
+          # Tentar diferentes versões do Boost compatíveis com io_service  
+          Write-Host "Attempting to install Boost..."  
+          $boostInstalled = $false  
+            
+          # Lista de versões compatíveis (em ordem de preferência)  
+          $boostVersions = @("1.65.1", "1.64.0", "1.63.0", "")  
+            
+          foreach ($version in $boostVersions) {  
+            try {  
+              if ($version -eq "") {  
+                Write-Host "Trying latest available Boost version..."  
+                C:\vcpkg\vcpkg install boost:x64-windows --recurse  
+              } else {  
+                Write-Host "Trying Boost version $version..."  
+                C:\vcpkg\vcpkg install boost:x64-windows@$version --recurse  
+              }  
+                
+              if ($LASTEXITCODE -eq 0) {  
+                Write-Host "✓ Boost $version installed successfully"  
+                $boostInstalled = $true  
+                break  
+              }  
+            } catch {  
+              Write-Host "Failed to install Boost $version, trying next..."  
+            }  
+          }  
+            
+          if (-not $boostInstalled) {  
+            Write-Error "Failed to install any compatible Boost version"  
+            exit 1  
           }  
             
           # Instalar outras dependências necessárias  
@@ -53,9 +77,35 @@ jobs:
             
       - name: Setup Boost directory structure  
         run: |  
-          # Verificar se vcpkg instalou corretamente  
-          if (!(Test-Path "C:\vcpkg\installed\x64-windows\include\boost")) {  
-            Write-Error "vcpkg Boost installation failed"  
+          # Verificação mais robusta da instalação do vcpkg  
+          Write-Host "Checking vcpkg installation..."  
+            
+          if (!(Test-Path "C:\vcpkg\installed\x64-windows")) {  
+            Write-Error "vcpkg x64-windows installation directory not found"  
+            exit 1  
+          }  
+            
+          # Verificar se pelo menos alguns headers do Boost existem  
+          $boostHeaders = @(  
+            "C:\vcpkg\installed\x64-windows\include\boost\version.hpp",  
+            "C:\vcpkg\installed\x64-windows\include\boost\config.hpp",  
+            "C:\vcpkg\installed\x64-windows\include\boost\asio.hpp"  
+          )  
+            
+          $foundHeaders = 0  
+          foreach ($header in $boostHeaders) {  
+            if (Test-Path $header) {  
+              $foundHeaders++  
+              Write-Host "✓ Found: $header"  
+            }  
+          }  
+            
+          if ($foundHeaders -eq 0) {  
+            Write-Error "No Boost headers found in vcpkg installation"  
+            Write-Host "Available include directories:"  
+            if (Test-Path "C:\vcpkg\installed\x64-windows\include") {  
+              Get-ChildItem "C:\vcpkg\installed\x64-windows\include" | Select-Object Name  
+            }  
             exit 1  
           }  
             
@@ -63,9 +113,13 @@ jobs:
           Write-Host "Setting up Boost directory structure..."  
           mkdir C:\local\boost_1_65_1 -Force  
             
-          # Copiar headers do boost (incluindo subdiretório boost)  
+          # Copiar headers do boost  
           if (Test-Path "C:\vcpkg\installed\x64-windows\include\boost") {  
+            Write-Host "Copying Boost headers..."  
             xcopy /E /I "C:\vcpkg\installed\x64-windows\include\boost" "C:\local\boost_1_65_1\boost\"  
+          } else {  
+            Write-Error "Boost headers directory not found in vcpkg"  
+            exit 1  
           }  
             
           # Copiar outros headers se existirem  
@@ -78,7 +132,10 @@ jobs:
           # Copiar bibliotecas  
           mkdir "C:\local\boost_1_65_1\lib64-msvc-14.3" -Force  
           if (Test-Path "C:\vcpkg\installed\x64-windows\lib") {  
+            Write-Host "Copying Boost libraries..."  
             xcopy /E /I "C:\vcpkg\installed\x64-windows\lib\*" "C:\local\boost_1_65_1\lib64-msvc-14.3\"  
+          } else {  
+            Write-Warning "No libraries found in vcpkg lib directory"  
           }  
             
       - name: Verify Boost installation  
