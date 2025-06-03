@@ -242,15 +242,7 @@ jobs:
       - name: Build project with compatibility settings  
         run: |  
           Write-Host "Building project..."  
-          msbuild sources/msvc/TheOTXServer.vcxproj `  
-            /p:Configuration=Release `  
-            /p:Platform=x64 `  
-            /p:PlatformToolset=v143 `  
-            /p:PreprocessorDefinitions="BOOST_ASIO_ENABLE_OLD_SERVICES;WIN64;NDEBUG;_CONSOLE;__USE_MYSQL__;__ENABLE_SERVER_DIAGNOSTIC__;__GROUND_CACHE__;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS" `  
-            /p:VcpkgRoot=C:\vcpkg `  
-            /p:VcpkgTriplet=x64-windows `  
-            /m:2 `  
-            /verbosity:minimal  
+    msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:Preproce  
               
       - name: Verify build output  
         run: |  
