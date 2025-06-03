@@ -16,14 +16,19 @@ jobs:
       - name: Setup MSBuild  
         uses: microsoft/setup-msbuild@v1.3  
           
-      - name: Setup Boost 1.84.0  
+      - name: Install Boost via vcpkg  
         run: |  
-          # Download Boost específico para o caminho esperado  
-          Invoke-WebRequest -Uri "https://github.com/actions/boost-versions/releases/download/1.84.0-20231205.1/boost-1.84.0-win32-msvc14.3-x64.tar.gz" -OutFile "boost.tar.gz"  
-          tar -xzf boost.tar.gz -C C:\  
-          move C:\boost_1_84_0 C:\local\boost_1_84_0  
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
+          C:\vcpkg\bootstrap-vcpkg.bat  
+          C:\vcpkg\vcpkg install boost:x64-windows  
             
-      - name: Verify SDK structure  
+      - name: Setup Boost directory structure  
+        run: |  
+          mkdir C:\local\boost_1_84_0 -Force  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\include\boost" "C:\local\boost_1_84_0\"  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\lib" "C:\local\boost_1_84_0\lib64-msvc-14.3\"  
+            
+      - name: Verify SDK and create missing directories  
         run: |  
           if (!(Test-Path "sources\otx-windows-sdk\lua\lib64")) {  
             Write-Host "Creating missing lib64 directories..."  
