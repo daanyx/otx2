@@ -22,11 +22,22 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat  
           C:\vcpkg\vcpkg install boost:x64-windows  
             
-      - name: Setup Boost directory structure  
+      - name: Setup Boost directory structure correctly  
         run: |  
           mkdir C:\local\boost_1_84_0 -Force  
-          xcopy /E /I "C:\vcpkg\installed\x64-windows\include\boost" "C:\local\boost_1_84_0\"  
-          xcopy /E /I "C:\vcpkg\installed\x64-windows\lib" "C:\local\boost_1_84_0\lib64-msvc-14.3\"  
+          # Copiar headers do boost para o diretório raiz esperado  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\include\*" "C:\local\boost_1_84_0\"  
+          # Copiar bibliotecas para o subdiretório esperado  
+          mkdir "C:\local\boost_1_84_0\lib64-msvc-14.3" -Force  
+          xcopy /E /I "C:\vcpkg\installed\x64-windows\lib\*" "C:\local\boost_1_84_0\lib64-msvc-14.3\"  
+            
+      - name: Verify Boost installation  
+        run: |  
+          if (!(Test-Path "C:\local\boost_1_84_0\boost\config.hpp")) {  
+            Write-Error "Boost headers not found at expected location"  
+            exit 1  
+          }  
+          Write-Host "Boost installation verified successfully"  
             
       - name: Verify SDK and create missing directories  
         run: |  
