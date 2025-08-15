@@ -1,0 +1,26 @@
+name: Build OTX Server 2 (Source Build)  
+  
+on:  
+  push:  
+    branches: [ main, master ]  
+  
+jobs:  
+  build:  
+    runs-on: windows-latest  
+      
+    steps:  
+    - name: Checkout code  
+      uses: actions/checkout@v4  
+        
+    - name: Cache Boost  
+      id: cache-boost  
+      uses: actions/cache@v3  
+      with:  
+        path: C:\local\boost_1_84_0  
+        key: boost-1.84.0-msvc-14.3-x64  
+          
+    - name: Build Boost from Source  
+      if: steps.cache-boost.outputs.cache-hit != 'true'  
+      run: |  
+        # Download and build Boost 1.84.0  
+        # (script para compilar do código fonte)
