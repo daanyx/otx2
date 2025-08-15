@@ -1,0 +1,96 @@
+- name: XDownload and Install Boost 1.84.0 (Enhanced Solution 1)  
+  run: |  
+    # Tentar múltiplos mirrors diretos  
+    $urls = @(  
+      "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/binaries/boost_1_84_0-msvc-14.3-64.exe",  
+      "https://github.com/actions/boost-versions/releases/download/1.84.0-20231205.1/boost_1_84_0-msvc-14.3-64.exe"  
+    )  
+      
+    $downloaded = $false  
+    foreach ($url in $urls) {  
+      try {  
+        Write-Host "Tentando download de: $url"  
+        Invoke-WebRequest -Uri $url -OutFile "boost_installer.exe" -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -TimeoutSec 300  
+          
+        # Verificar se o arquivo é válido  
+        $fileSize = (Get-Item "boost_installer.exe").Length  
+        if ($fileSize -gt 50MB) {  
+          Write-Host "Download bem-sucedido. Tamanho: $($fileSize / 1MB) MB"  
+          $downloaded = $true  
+          break  
+        } else {  
+          Write-Warning "Arquivo muito pequeno ($($fileSize / 1MB) MB), tentando próximo mirror..."  
+          Remove-Item "boost_installer.exe" -ErrorAction SilentlyContinue  
+        }  
+      }  
+      catch {  
+        Write-Warning "Falha no download de $url : $_"  
+        Remove-Item "boost_installer.exe" -ErrorAction SilentlyContinue  
+      }  
+    }  
+      
+    if (-not $downloaded) {  
+      Write-Error "Todos os mirrors falharam"  
+      exit 1  
+    }  
+      
+    # Verificar se é um executável válido (header PE)  
+    $fileHeader = Get-Content "boost_installer.exe" -Encoding Byte -TotalCount 2  
+    if ($fileHeader[0] -ne 0x4D -or $fileHeader[1] -ne 0x5A) {  
+      Write-Error "Arquivo não é um executável válido (header: $($fileHeader[0]), $($fileHeader[1]))"  
+      exit 1  
+    }  
+      
+    # Criar diretório base se não existir  
+    New-Item -ItemType Directory -Path "C:\local" -Force  
+      
+    # Instalar Boost com logs detalhados  
+    Write-Host "Iniciando instalação do Boost..."  
+    $process = Start-Process -FilePath "boost_installer.exe" -ArgumentList "/S", "/D=C:\local\boost_1_84_0" -Wait -PassThru -NoNewWindow  
+      
+    Write-Host "Código de saída do instalador: $($process.ExitCode)"  
+      
+    # Aguardar um pouco para o sistema de arquivos se atualizar  
+    Start-Sleep -Seconds 5  
+      
+    # Diagnóstico detalhado da estrutura criada  
+    Write-Host "Verificando estrutura de diretórios..."  
+    if (Test-Path "C:\local\boost_1_84_0") {  
+      Write-Host "Diretório base encontrado: C:\local\boost_1_84_0"  
+      Get-ChildItem "C:\local\boost_1_84_0" | ForEach-Object { Write-Host "  - $($_.Name)" }  
+        
+      # Procurar por diretórios de bibliotecas  
+      $libDirs = Get-ChildItem "C:\local\boost_1_84_0" -Directory | Where-Object { $_.Name -like "*lib*" }  
+      if ($libDirs) {  
+        Write-Host "Diretórios de bibliotecas encontrados:"  
+        $libDirs | ForEach-Object { Write-Host "  - $($_.FullName)" }  
+          
+        # Se não encontrar lib64-msvc-14.3, tentar criar symlink  
+        if (-not (Test-Path "C:\local\boost_1_84_0\lib64-msvc-14.3")) {  
+          $msvcLib = $libDirs | Where-Object { $_.Name -like "*msvc*" -and $_.Name -like "*64*" } | Select-Object -First 1  
+          if ($msvcLib) {  
+            Write-Host "Criando symlink de $($msvcLib.FullName) para C:\local\boost_1_84_0\lib64-msvc-14.3"  
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0\lib64-msvc-14.3" -Target $msvcLib.FullName -Force  
+          }  
+        }  
+      } else {  
+        Write-Warning "Nenhum diretório de bibliotecas encontrado"  
+      }  
+    } else {  
+      Write-Error "Diretório base não foi criado: C:\local\boost_1_84_0"  
+      exit 1  
+    }  
+      
+    # Verificação final  
+    if (Test-Path "C:\local\boost_1_84_0\lib64-msvc-14.3") {  
+      Write-Host "Boost instalado com sucesso!"  
+      $libCount = (Get-ChildItem "C:\local\boost_1_84_0\lib64-msvc-14.3" -File).Count  
+      Write-Host "Bibliotecas encontradas: $libCount arquivos"  
+    } else {  
+      Write-Error "Instalação do Boost falhou - diretório de bibliotecas não encontrado"  
+      Write-Host "Listando conteúdo de C:\local\boost_1_84_0:"  
+      if (Test-Path "C:\local\boost_1_84_0") {  
+        Get-ChildItem "C:\local\boost_1_84_0" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.FullName)" }  
+      }  
+      exit 1  
+    }
