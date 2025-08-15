@@ -1,4 +1,4 @@
-- name: XDownload and Install Boost 1.84.0 (Enhanced Solution 1)  
+- name: Download and Install Boost 1.84.0 (Enhanced Solution 1)  
   run: |  
     # Tentar múltiplos mirrors diretos  
     $urls = @(  
