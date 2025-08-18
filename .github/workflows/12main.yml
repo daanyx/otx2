@@ -1,4 +1,4 @@
-name: 12Build OTX Server  
+name: 121Build OTX Server  
 on: [push, pull_request]  
   
 jobs:  
