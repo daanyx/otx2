@@ -1,271 +1,64 @@
-name: Build OTX Server 2 - Windows  
-  
-on:  
-  push:  
-    branches: [ main, master ]  
-  pull_request:  
-    branches: [ main, master ]  
-  
-jobs:  
-  build-windows:  
-    runs-on: windows-2022  
-      
-    steps:  
-      - name: Checkout repository  
-        uses: actions/checkout@v4  
+name: 29Build OTX Server    
+on: [push, pull_request]    
+    
+jobs:    
+  build:    
+    runs-on: windows-latest    
+    steps:    
+      - uses: actions/checkout@v4    
           
-      - name: Setup MSBuild  
-        uses: microsoft/setup-msbuild@v2  
+      - name: Cache Boost    
+        uses: actions/cache@v4    
+        id: cache-boost    
+        with:    
+          path: |    
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3    
+            C:\local\boost_1_84_0    
+          key: boost-1.84.0-msvc-14.3-${{ runner.os }}    
+            
+      - name: Install Boost via Chocolatey    
+        if: steps.cache-boost.outputs.cache-hit != 'true'    
+        run: |    
+          choco install boost-msvc-14.3 --version=1.84.0 -y    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
+          if (!(Test-Path "C:\local\boost_1_84_0")) {    
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
+          }    
+        shell: powershell    
           
-      - name: Cache vcpkg  
-        uses: actions/cache@v4  
-        with:  
-          path: |  
-            C:\vcpkg\installed  
-            C:\vcpkg\buildtrees  
-            C:\vcpkg\packages  
-          key: ${{ runner.os }}-vcpkg-boost165-${{ hashFiles('**/vcpkg.json') }}  
-          restore-keys: |  
-            ${{ runner.os }}-vcpkg-boost165-  
-              
-      - name: Install dependencies via vcpkg  
-        run: |  
-          if (!(Test-Path "C:\vcpkg")) {  
-            git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
-            C:\vcpkg\bootstrap-vcpkg.bat  
-          }  
+      - name: Create Boost symlink (if cached)    
+        if: steps.cache-boost.outputs.cache-hit == 'true'    
+        run: |    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
+          if (!(Test-Path "C:\local\boost_1_84_0")) {    
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
+          }    
+        shell: powershell    
             
-          # Tentar diferentes versões do Boost compatíveis com io_service  
-          Write-Host "Attempting to install Boost..."  
-          $boostInstalled = $false  
-            
-          # Lista de versões compatíveis (em ordem de preferência)  
-          $boostVersions = @("1.65.1", "1.64.0", "1.63.0", "")  
-            
-          foreach ($version in $boostVersions) {  
-            try {  
-              if ($version -eq "") {  
-                Write-Host "Trying latest available Boost version..."  
-                C:\vcpkg\vcpkg install boost:x64-windows --recurse  
-              } else {  
-                Write-Host "Trying Boost version $version..."  
-                C:\vcpkg\vcpkg install boost:x64-windows@$version --recurse  
-              }  
+      - name: Cache MSBuild objects    
+        uses: actions/cache@v4    
+        with:    
+          path: |    
+            sources/msvc/x64    
+            sources/msvc/*.tlog    
+          key: msbuild-cache-${{ runner.os }}-${{ hashFiles('sources/**/*.cpp', 'sources/**/*.h') }}    
+          restore-keys: |    
+            msbuild-cache-${{ runner.os }}-    
                 
-              if ($LASTEXITCODE -eq 0) {  
-                Write-Host "✓ Boost $version installed successfully"  
-                $boostInstalled = $true  
-                break  
-              }  
-            } catch {  
-              Write-Host "Failed to install Boost $version, trying next..."  
-            }  
-          }  
+      - name: Setup MSBuild    
+        uses: microsoft/setup-msbuild@v2    
             
-          if (-not $boostInstalled) {  
-            Write-Error "Failed to install any compatible Boost version"  
-            exit 1  
-          }  
-            
-          # Instalar outras dependências necessárias  
-          Write-Host "Installing other dependencies..."  
-          C:\vcpkg\vcpkg install libxml2:x64-windows --recurse  
-          C:\vcpkg\vcpkg install sqlite3:x64-windows --recurse  
-          C:\vcpkg\vcpkg install openssl:x64-windows --recurse  
-          C:\vcpkg\vcpkg install lua:x64-windows --recurse  
-          C:\vcpkg\vcpkg install pugixml:x64-windows --recurse  
-            
-      - name: Setup Boost directory structure  
+      - name: Build    
+        run: msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m    
+  
+      - name: Prepare artifacts  
         run: |  
-          # Verificação mais robusta da instalação do vcpkg  
-          Write-Host "Checking vcpkg installation..."  
+          mkdir artifact-staging  
+          copy sources\msvc\x64\Release\*.exe artifact-staging\  
+        shell: cmd  
             
-          if (!(Test-Path "C:\vcpkg\installed\x64-windows")) {  
-            Write-Error "vcpkg x64-windows installation directory not found"  
-            exit 1  
-          }  
-            
-          # Verificar se pelo menos alguns headers do Boost existem  
-          $boostHeaders = @(  
-            "C:\vcpkg\installed\x64-windows\include\boost\version.hpp",  
-            "C:\vcpkg\installed\x64-windows\include\boost\config.hpp",  
-            "C:\vcpkg\installed\x64-windows\include\boost\asio.hpp"  
-          )  
-            
-          $foundHeaders = 0  
-          foreach ($header in $boostHeaders) {  
-            if (Test-Path $header) {  
-              $foundHeaders++  
-              Write-Host "✓ Found: $header"  
-            }  
-          }  
-            
-          if ($foundHeaders -eq 0) {  
-            Write-Error "No Boost headers found in vcpkg installation"  
-            Write-Host "Available include directories:"  
-            if (Test-Path "C:\vcpkg\installed\x64-windows\include") {  
-              Get-ChildItem "C:\vcpkg\installed\x64-windows\include" | Select-Object Name  
-            }  
-            exit 1  
-          }  
-            
-          # Criar estrutura esperada pelo projeto  
-          Write-Host "Setting up Boost directory structure..."  
-          mkdir C:\local\boost_1_65_1 -Force  
-            
-          # Copiar headers do boost  
-          if (Test-Path "C:\vcpkg\installed\x64-windows\include\boost") {  
-            Write-Host "Copying Boost headers..."  
-            xcopy /E /I "C:\vcpkg\installed\x64-windows\include\boost" "C:\local\boost_1_65_1\boost\"  
-          } else {  
-            Write-Error "Boost headers directory not found in vcpkg"  
-            exit 1  
-          }  
-            
-          # Copiar outros headers se existirem  
-          Get-ChildItem "C:\vcpkg\installed\x64-windows\include\" -Directory | ForEach-Object {  
-            if ($_.Name -ne "boost") {  
-              xcopy /E /I $_.FullName "C:\local\boost_1_65_1\$($_.Name)\" 2>$null  
-            }  
-          }  
-            
-          # Copiar bibliotecas  
-          mkdir "C:\local\boost_1_65_1\lib64-msvc-14.3" -Force  
-          if (Test-Path "C:\vcpkg\installed\x64-windows\lib") {  
-            Write-Host "Copying Boost libraries..."  
-            xcopy /E /I "C:\vcpkg\installed\x64-windows\lib\*" "C:\local\boost_1_65_1\lib64-msvc-14.3\"  
-          } else {  
-            Write-Warning "No libraries found in vcpkg lib directory"  
-          }  
-            
-      - name: Verify Boost installation  
-        run: |  
-          Write-Host "Verifying Boost installation..."  
-          Write-Host "Looking for: C:\local\boost_1_65_1\boost\config.hpp"  
-            
-          if (Test-Path "C:\local\boost_1_65_1\boost\config.hpp") {  
-            Write-Host "✓ Boost headers found successfully"  
-          } else {  
-            Write-Host "❌ Boost config.hpp not found"  
-            Write-Host "Directory contents:"  
-            if (Test-Path "C:\local\boost_1_65_1") {  
-              Get-ChildItem "C:\local\boost_1_65_1" -Recurse | Select-Object FullName | Format-Table -AutoSize  
-            }  
-            Write-Host "vcpkg Boost contents:"  
-            if (Test-Path "C:\vcpkg\installed\x64-windows\include\boost") {  
-              Get-ChildItem "C:\vcpkg\installed\x64-windows\include\boost" | Select-Object Name | Format-Table -AutoSize  
-            }  
-            Write-Error "Boost headers not found"  
-            exit 1  
-          }  
-            
-      - name: Setup complete SDK structure  
-        run: |  
-          Write-Host "Setting up complete SDK structure..."  
-            
-          # Criar TODOS os diretórios SDK necessários conforme projeto  
-          $sdkDirs = @(  
-            "sources\otx-windows-sdk\lua\lib64",  
-            "sources\otx-windows-sdk\lua\include",  
-            "sources\otx-windows-sdk\libxml2\lib64",   
-            "sources\otx-windows-sdk\libxml2\include",  
-            "sources\otx-windows-sdk\sqlite3\lib64",  
-            "sources\otx-windows-sdk\sqlite3\include",  
-            "sources\otx-windows-sdk\pugixml",  
-            "sources\otx-windows-sdk\pugixml\include",  
-            "sources\otx-windows-sdk\openssl\lib64",  
-            "sources\otx-windows-sdk\openssl\include",  
-            "sources\otx-windows-sdk\mysql-connector-c\lib64",  
-            "sources\otx-windows-sdk\mysql-connector-c\include",  
-            "sources\otx-windows-sdk\mpir\lib64",  
-            "sources\otx-windows-sdk\mpir\include",  
-            "sources\otx-windows-sdk\libiconv\lib64",  
-            "sources\otx-windows-sdk\libiconv\include",  
-            "sources\otx-windows-sdk\lib64-msvc-14.3"  
-          )  
-            
-          foreach ($dir in $sdkDirs) {  
-            if (!(Test-Path $dir)) {  
-              Write-Host "Creating SDK directory: $dir"  
-              mkdir $dir -Force  
-            }  
-          }  
-            
-          # Copiar bibliotecas do vcpkg para SDK  
-          Write-Host "Copying libraries from vcpkg to SDK..."  
-          if (Test-Path "C:\vcpkg\installed\x64-windows\lib") {  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*xml2*" "sources\otx-windows-sdk\libxml2\lib64\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*sqlite*" "sources\otx-windows-sdk\sqlite3\lib64\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*ssl*" "sources\otx-windows-sdk\openssl\lib64\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*lua*" "sources\otx-windows-sdk\lua\lib64\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\lib\*pugi*" "sources\otx-windows-sdk\pugixml\" 2>$null  
-          }  
-            
-          # Copiar headers do vcpkg para SDK  
-          Write-Host "Copying headers from vcpkg to SDK..."  
-          if (Test-Path "C:\vcpkg\installed\x64-windows\include") {  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\include\libxml2" "sources\otx-windows-sdk\libxml2\include\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\include\sqlite3.h" "sources\otx-windows-sdk\sqlite3\include\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\include\openssl" "sources\otx-windows-sdk\openssl\include\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\include\lua*" "sources\otx-windows-sdk\lua\include\" 2>$null  
-            xcopy /E /Y "C:\vcpkg\installed\x64-windows\include\pugixml.hpp" "sources\otx-windows-sdk\pugixml\include\" 2>$null  
-          }  
-            
-      - name: Verify SDK structure  
-        run: |  
-          Write-Host "Verifying SDK structure..."  
-          $requiredDirs = @(  
-            "sources\otx-windows-sdk\lua\lib64",  
-            "sources\otx-windows-sdk\libxml2\lib64",  
-            "sources\otx-windows-sdk\sqlite3\lib64",  
-            "sources\otx-windows-sdk\openssl\lib64",  
-            "sources\otx-windows-sdk\pugixml"  
-          )  
-            
-          foreach ($dir in $requiredDirs) {  
-            if (Test-Path $dir) {  
-              Write-Host "✓ $dir exists"  
-            } else {  
-              Write-Warning "⚠ $dir missing"  
-            }  
-          }  
-            
-      - name: Update project file for Boost 1.65  
-        run: |  
-          Write-Host "Updating project file for Boost 1.65..."  
-          $projectFile = "sources\msvc\TheOTXServer.vcxproj"  
-          if (Test-Path $projectFile) {  
-            (Get-Content $projectFile) -replace 'C:\\local\\boost_1_84_0', 'C:\local\boost_1_65_1' | Set-Content $projectFile  
-            Write-Host "✓ Project file updated for Boost 1.65"  
-          }  
-            
-      - name: Build project with compatibility settings  
-        run: |  
-          Write-Host "Building project..."  
-          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:PreprocessorDefinitions="BOOST_ASIO_ENABLE_OLD_SERVICES;NDEBUG;_CONSOLE;__USE_MYSQL__;__ENABLE_SERVER_DIAGNOSTIC__;__GROUND_CACHE__;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS" /p:VcpkgRoot=C:\vcpkg /p:VcpkgTriplet=x64-windows /m:2 /verbosity:minimal  
-            
-      - name: Verify build output  
-        run: |  
-          if (Test-Path "sources/msvc/x64/Release/TheOTXServer.exe") {  
-            $fileInfo = Get-Item "sources/msvc/x64/Release/TheOTXServer.exe"  
-            Write-Host "✓ Build successful!"  
-            Write-Host "  - Size: $($fileInfo.Length) bytes"  
-            Write-Host "  - Created: $($fileInfo.CreationTime)"  
-            Write-Host "  - Path: $($fileInfo.FullName)"  
-          } else {  
-            Write-Error "Build failed - executable not found"  
-            Write-Host "Checking build directory contents:"  
-            if (Test-Path "sources/msvc/x64/Release") {  
-              Get-ChildItem "sources/msvc/x64/Release" | Format-Table Name, Length, LastWriteTime  
-            }  
-            exit 1  
-          }  
-            
-      - name: Upload artifacts  
-        uses: actions/upload-artifact@v4  
-        with:  
-          name: otx-server-windows-x64-${{ github.sha }}  
-          path: |  
-            sources/msvc/x64/Release/TheOTXServer.exe  
-            sources/msvc/x64/Release/*.dll  
-          retention-days: 30
+      - name: Upload Artifact    
+        uses: actions/upload-artifact@v4    
+        with:    
+          name: otx-server-build    
+          path: artifact-staging/
