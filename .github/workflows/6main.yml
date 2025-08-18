@@ -25,9 +25,12 @@ jobs:
         run: |  
           echo "::group::📦 Installing Boost"  
           choco install boost-msvc-14.3 --version=1.84.0 -y  
-          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
-          if (!(Test-Path "C:\local\boost_1_84_0")) {  
-            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
+          $localPath = 'C:\local'  
+          $boostPath = 'C:\local\boost_1_84_0'  
+          $targetPath = 'C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools'  
+          if (!(Test-Path $localPath)) { New-Item -ItemType Directory -Path $localPath }  
+          if (!(Test-Path $boostPath)) {  
+            New-Item -ItemType SymbolicLink -Path $boostPath -Target $targetPath  
           }  
           echo "::endgroup::"  
         shell: powershell  
@@ -36,9 +39,12 @@ jobs:
         if: steps.cache-boost.outputs.cache-hit == 'true'  
         run: |  
           echo "::notice::📦 Using cached Boost libraries"  
-          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
-          if (!(Test-Path "C:\local\boost_1_84_0")) {  
-            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
+          $localPath = 'C:\local'  
+          $boostPath = 'C:\local\boost_1_84_0'  
+          $targetPath = 'C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools'  
+          if (!(Test-Path $localPath)) { New-Item -ItemType Directory -Path $localPath }  
+          if (!(Test-Path $boostPath)) {  
+            New-Item -ItemType SymbolicLink -Path $boostPath -Target $targetPath  
           }  
         shell: powershell  
             
