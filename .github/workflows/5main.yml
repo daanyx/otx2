@@ -1,4 +1,4 @@
-name: Build OTX Server 2 - Windows x64 Release  
+name: xBuild OTX Server 2 - Windows x64 Release  
   
 on: [push, pull_request]  
   
@@ -26,28 +26,4 @@ jobs:
     - name: Build x64 Release  
       run: |  
         cd sources/msvc  
-        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m  
-      
-    - name: Collect Release Files  
-      run: |  
-        mkdir release  
-          
-        # Copiar executável principal  
-        copy "sources\msvc\x64\Release\TheOTXServer.exe" release\  
-          
-        # Copiar DLLs necessárias do SDK  
-        copy "sources\otx-windows-sdk\lib64-msvc-14.3\*.dll" release\ 2>nul || echo "No SDK DLLs found"  
-        copy "sources\otx-windows-sdk\libxml2\lib64\*.dll" release\ 2>nul || echo "No libxml2 DLLs found"  
-        copy "sources\otx-windows-sdk\mysql-connector-c\lib64\*.dll" release\ 2>nul || echo "No MySQL DLLs found"  
-        copy "sources\otx-windows-sdk\openssl\lib64\*.dll" release\ 2>nul || echo "No OpenSSL DLLs found"  
-        copy "sources\otx-windows-sdk\lua\lib64\*.dll" release\ 2>nul || echo "No Lua DLLs found"  
-          
-        # Listar arquivos coletados  
-        dir release  
-      
-    - name: Upload Release Artifacts  
-      uses: actions/upload-artifact@v4  
-      with:  
-        name: otx-server-2-v2.16-windows-x64  
-        path: release/  
-        retention-days: 90
+        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m
