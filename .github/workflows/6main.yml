@@ -1,4 +1,4 @@
-name: xxxBuild OTX Server  
+name: 🏗️ Build OTX Server - Release x64  
 on:     
   push:    
     branches: [ main, develop ]    
@@ -7,17 +7,14 @@ on:
     
 jobs:    
   build:    
-    runs-on: windows-latest    
-    strategy:    
-      matrix:    
-        configuration: [Release]    
-        platform: [x64]    
+    name: 🚀 Build Release x64  
+    runs-on: windows-latest  
         
     steps:    
-      - name: Checkout    
+      - name: 📥 Checkout Repository  
         uses: actions/checkout@v4    
             
-      - name: Cache Boost    
+      - name: 💾 Cache Boost Libraries  
         uses: actions/cache@v4    
         id: cache-boost    
         with:    
@@ -26,42 +23,44 @@ jobs:
             C:\local\boost_1_84_0    
           key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}    
               
-      - name: Install Boost via Chocolatey    
+      - name: 🍫 Install Boost via Chocolatey    
         if: steps.cache-boost.outputs.cache-hit != 'true'    
         run: |    
+          Write-Host "🔽 Instalando Boost 1.84.0..." -ForegroundColor Yellow  
           choco install boost-msvc-14.3 --version=1.84.0 -y    
+            
+          Write-Host "📁 Configurando diretórios..." -ForegroundColor Cyan  
           if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
           if (!(Test-Path "C:\local\boost_1_84_0")) {    
             New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
           }    
+          Write-Host "✅ Boost configurado!" -ForegroundColor Green  
         shell: powershell    
             
-      - name: Setup MSBuild    
+      - name: ⚙️ Setup MSBuild    
         uses: microsoft/setup-msbuild@v2    
             
-      - name: Verify Build Environment    
+      - name: 🔍 Verify Build Environment    
         run: |    
-          Write-Host "=== Build Environment ==="    
-          Write-Host "Boost Path: $(Test-Path 'C:\local\boost_1_84_0')"    
-          Write-Host "Boost Libs: $(Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3')"    
-          Write-Host "MSBuild Version:"    
+          Write-Host "🔧 === Build Environment Check ===" -ForegroundColor Cyan  
+          Write-Host "📦 Boost Path: $(if (Test-Path 'C:\local\boost_1_84_0') { '✅ OK' } else { '❌ MISSING' })"    
+          Write-Host "📚 Boost Libs: $(if (Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3') { '✅ OK' } else { '❌ MISSING' })"    
+          Write-Host "🛠️ MSBuild Version:" -ForegroundColor Cyan  
           msbuild -version    
+          Write-Host "✨ Environment ready!" -ForegroundColor Green  
         shell: powershell    
             
-      - name: Build OTX Server    
+      - name: 🚀 Build OTX Server (Release x64)  
         run: |    
-          msbuild sources/msvc/TheOTXServer.vcxproj `    
-            /p:Configuration=${{ matrix.configuration }} `    
-            /p:Platform=${{ matrix.platform }} `    
-            /m `    
-            /v:minimal `    
-            /p:WarningLevel=1    
+          Write-Host "🔨 Compilando OTX Server em Release x64..." -ForegroundColor Yellow  
+          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m /v:minimal /p:WarningLevel=1  
+          Write-Host "🎉 Compilação concluída!" -ForegroundColor Green  
         shell: powershell    
             
-      - name: Upload Artifacts    
+      - name: 📦 Upload Release Artifacts  
         uses: actions/upload-artifact@v4    
         with:    
-          name: TheOTXServer-${{ matrix.configuration }}-${{ matrix.platform }}    
+          name: 🎯 OTXServer-Release-x64  
           path: |    
             sources/msvc/x64/Release/TheOTXServer.exe    
             sources/msvc/x64/Release/TheOTXServer.pdb    
