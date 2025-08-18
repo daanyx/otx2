@@ -1,9 +1,9 @@
-name: xBuild OTX Server 2 - Windows x64 Release  
+name: Build OTX Server 2  
   
 on: [push, pull_request]  
   
 jobs:  
-  build-windows-x64:  
+  build:  
     runs-on: windows-latest  
     steps:  
     - uses: actions/checkout@v4  
@@ -13,17 +13,33 @@ jobs:
       
     - name: Cache Boost  
       uses: actions/cache@v4  
-      id: cache-boost  
       with:  
         path: C:\local\boost_1_84_0  
         key: boost-1.84.0-msvc-14.3-x64  
       
-    - name: Install Boost via Chocolatey  
+    - name: Install Boost  
       if: steps.cache-boost.outputs.cache-hit != 'true'  
-      run: |  
-        choco install boost-msvc-14.3 --version=1.84.0 -y  
+      run: choco install boost-msvc-14.3 --version=1.84.0 -y  
       
-    - name: Build x64 Release  
+    - name: Build  
       run: |  
         cd sources/msvc  
-        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m  
+      
+    - name: Package Release  
+      run: |  
+        mkdir dist  
+        copy sources\msvc\x64\Release\TheOTXServer.exe dist\  
+        copy ..\otx-windows-sdk\lua\lib64\lua51.dll dist\  
+        copy ..\otx-windows-sdk\libxml2\lib64\libxml2.dll dist\  
+        copy ..\otx-windows-sdk\mpir\lib64\mpir.dll dist\  
+        copy ..\otx-windows-sdk\mysql-connector-c\lib64\libmysql.dll dist\  
+        copy ..\otx-windows-sdk\openssl\lib64\libeay32.dll dist\  
+        copy ..\otx-windows-sdk\openssl\lib64\ssleay32.dll dist\  
+        copy ..\otx-windows-sdk\libiconv\lib64\iconv.dll dist\  
+      
+    - name: Upload  
+      uses: actions/upload-artifact@v4  
+      with:  
+        name: otx-server-windows-x64  
+        path: dist/
