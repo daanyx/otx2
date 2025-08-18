@@ -20,27 +20,27 @@ jobs:
       - name: 📦 Install Boost     
         if: steps.cache-boost.outputs.cache-hit != 'true'      
         run: |      
-          echo "🔄 Installing Boost libraries..."  
+          echo "[INSTALL] Installing Boost libraries..."  
           choco install boost-msvc-14.3 --version=1.84.0 -y      
           if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
           if (!(Test-Path "C:\local\boost_1_84_0")) {      
             New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
           }      
-          echo "✅ Boost installation completed!"  
+          echo "[OK] Boost installation completed!"  
         shell: powershell      
             
       - name: 🔗 Create Boost Symlink      
-  if: steps.cache-boost.outputs.cache-hit == 'true'      
-  run: |      
-    echo "[CACHE] Using cached Boost libraries..."  
-    if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
-    if (!(Test-Path "C:\local\boost_1_84_0")) {      
-      New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
-    }      
-    echo "[OK] Boost symlink created!"  
-  shell: powershell      
+        if: steps.cache-boost.outputs.cache-hit == 'true'      
+        run: |      
+          echo "[CACHE] Using cached Boost libraries..."  
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
+          if (!(Test-Path "C:\local\boost_1_84_0")) {      
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
+          }      
+          echo "[OK] Boost symlink created!"  
+        shell: powershell      
               
-      - name: 💾 Cache MSBuild Objects
+      - name: 💾 Cache MSBuild Objects      
         uses: actions/cache@v4      
         with:      
           path: |      
@@ -55,16 +55,17 @@ jobs:
               
       - name: 🏗️ Build OTX Server      
         run: |  
-          echo "🚀 Starting OTX Server compilation..."  
+          echo "[BUILD] Starting OTX Server compilation..."  
           msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m  
-          echo "✅ Build completed successfully!"  
+          echo "[OK] Build completed successfully!"  
+        shell: powershell  
     
       - name: 📋 Prepare Artifacts    
         run: |    
-          echo "📦 Preparing build artifacts..."  
+          echo [PREPARE] Preparing build artifacts...  
           mkdir artifact-staging    
           copy sources\msvc\x64\Release\*.exe artifact-staging\    
-          echo "✅ Artifacts prepared!"  
+          echo [OK] Artifacts prepared!  
         shell: cmd    
               
       - name: ⬆️ Upload Artifact      
@@ -76,12 +77,14 @@ jobs:
       - name: 🎉 Build Success Notification  
         if: success()  
         run: |  
-          echo "🎊 SUCCESS! OTX Server build completed successfully!"  
-          echo "📁 Artifact: otx-server-build"  
-          echo "🔗 Download your build from the Actions tab"  
+          echo "[SUCCESS] OTX Server build completed successfully!"  
+          echo "[INFO] Artifact: otx-server-build"  
+          echo "[INFO] Download your build from the Actions tab"  
+        shell: powershell  
   
       - name: ❌ Build Failure Notification    
         if: failure()  
         run: |  
-          echo "💥 BUILD FAILED! Please check the logs above for errors."  
-          echo "🔍 Common issues: Missing dependencies, compilation errors"
+          echo "[FAILED] BUILD FAILED! Please check the logs above for errors."  
+          echo "[HELP] Common issues: Missing dependencies, compilation errors"  
+        shell: powershell
