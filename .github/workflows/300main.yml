@@ -1,0 +1,87 @@
+name: 🚀 Build OTX Server      
+on: [push, pull_request]      
+      
+jobs:      
+  build:      
+    runs-on: windows-latest      
+    steps:      
+      - name: 📥 Checkout Code  
+        uses: actions/checkout@v4      
+            
+      - name: 🗂️ Cache Boost      
+        uses: actions/cache@v4      
+        id: cache-boost      
+        with:      
+          path: |      
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3      
+            C:\local\boost_1_84_0      
+          key: boost-1.84.0-msvc-14.3-${{ runner.os }}      
+              
+      - name: 📦 Install Boost     
+        if: steps.cache-boost.outputs.cache-hit != 'true'      
+        run: |      
+          echo "🔄 Installing Boost libraries..."  
+          choco install boost-msvc-14.3 --version=1.84.0 -y      
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
+          if (!(Test-Path "C:\local\boost_1_84_0")) {      
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
+          }      
+          echo "✅ Boost installation completed!"  
+        shell: powershell      
+            
+      - name: 🔗 Create Boost Symlink      
+        if: steps.cache-boost.outputs.cache-hit == 'true'      
+        run: |      
+          echo "♻️ Using cached Boost libraries..."  
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
+          if (!(Test-Path "C:\local\boost_1_84_0")) {      
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
+          }      
+          echo "✅ Boost symlink created!"  
+        shell: powershell      
+              
+      - name: 💾 Cache MSBuild Objects      
+        uses: actions/cache@v4      
+        with:      
+          path: |      
+            sources/msvc/x64      
+            sources/msvc/*.tlog      
+          key: msbuild-cache-${{ runner.os }}-${{ hashFiles('sources/**/*.cpp', 'sources/**/*.h') }}      
+          restore-keys: |      
+            msbuild-cache-${{ runner.os }}-      
+                  
+      - name: 🔧 Setup MSBuild      
+        uses: microsoft/setup-msbuild@v2      
+              
+      - name: 🏗️ Build OTX Server      
+        run: |  
+          echo "🚀 Starting OTX Server compilation..."  
+          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m  
+          echo "✅ Build completed successfully!"  
+    
+      - name: 📋 Prepare Artifacts    
+        run: |    
+          echo "📦 Preparing build artifacts..."  
+          mkdir artifact-staging    
+          copy sources\msvc\x64\Release\*.exe artifact-staging\    
+          echo "✅ Artifacts prepared!"  
+        shell: cmd    
+              
+      - name: ⬆️ Upload Artifact      
+        uses: actions/upload-artifact@v4      
+        with:      
+          name: 🎯 otx-server-build      
+          path: artifact-staging/  
+  
+      - name: 🎉 Build Success Notification  
+        if: success()  
+        run: |  
+          echo "🎊 SUCCESS! OTX Server build completed successfully!"  
+          echo "📁 Artifact: otx-server-build"  
+          echo "🔗 Download your build from the Actions tab"  
+  
+      - name: ❌ Build Failure Notification    
+        if: failure()  
+        run: |  
+          echo "💥 BUILD FAILED! Please check the logs above for errors."  
+          echo "🔍 Common issues: Missing dependencies, compilation errors"
