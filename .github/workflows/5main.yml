@@ -47,6 +47,14 @@ jobs:
           Write-Host "sources/otx-windows-sdk directory NOT found"  
         }  
         
+    - name: Install Dependencies with vcpkg  
+      run: |  
+        Write-Host "Installing dependencies via vcpkg..."  
+        git clone https://github.com/Microsoft/vcpkg.git  
+        .\vcpkg\bootstrap-vcpkg.bat  
+        .\vcpkg\vcpkg install lua:x64-windows libxml2:x64-windows openssl:x64-windows mysql-connector-cpp:x64-windows libiconv:x64-windows mpir:x64-windows --triplet x64-windows  
+        Write-Host "vcpkg installation completed"  
+          
     - name: Build  
       run: |  
         cd sources/msvc  
@@ -64,24 +72,56 @@ jobs:
         mkdir dist  
         copy sources\msvc\x64\Release\TheOTXServer.exe dist\  
           
-        # Verificar cada DLL individualmente antes de copiar  
-        $dlls = @(  
-          "sources\otx-windows-sdk\lua\lib64\lua51.dll",  
-          "sources\otx-windows-sdk\libxml2\lib64\libxml2.dll",  
-          "sources\otx-windows-sdk\mpir\lib64\mpir.dll",  
-          "sources\otx-windows-sdk\mysql-connector-c\lib64\libmysql.dll",  
-          "sources\otx-windows-sdk\openssl\lib64\libeay32.dll",  
-          "sources\otx-windows-sdk\openssl\lib64\ssleay32.dll",  
-          "sources\otx-windows-sdk\libiconv\lib64\iconv.dll"  
+        # Tentar copiar DLLs do SDK primeiro, depois do vcpkg  
+        $sdkDlls = @(  
+          @{src="sources\otx-windows-sdk\lua\lib64\lua51.dll"; name="lua51.dll"},  
+          @{src="sources\otx-windows-sdk\libxml2\lib64\libxml2.dll"; name="libxml2.dll"},  
+          @{src="sources\otx-windows-sdk\mpir\lib64\mpir.dll"; name="mpir.dll"},  
+          @{src="sources\otx-windows-sdk\mysql-connector-c\lib64\libmysql.dll"; name="libmysql.dll"},  
+          @{src="sources\otx-windows-sdk\openssl\lib64\libeay32.dll"; name="libeay32.dll"},  
+          @{src="sources\otx-windows-sdk\openssl\lib64\ssleay32.dll"; name="ssleay32.dll"},  
+          @{src="sources\otx-windows-sdk\libiconv\lib64\iconv.dll"; name="iconv.dll"}  
         )  
           
-        foreach ($dll in $dlls) {  
-          if (Test-Path $dll) {  
-            Write-Host "Copying $dll"  
-            copy $dll dist\  
+        $vcpkgDlls = @(  
+          @{src="vcpkg\installed\x64-windows\bin\lua51.dll"; name="lua51.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\libxml2.dll"; name="libxml2.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\mpir.dll"; name="mpir.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\libmysql.dll"; name="libmysql.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll"; name="libcrypto-3-x64.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\libssl-3-x64.dll"; name="libssl-3-x64.dll"},  
+          @{src="vcpkg\installed\x64-windows\bin\iconv.dll"; name="iconv.dll"}  
+        )  
+          
+        foreach ($dll in $sdkDlls) {  
+          if (Test-Path $dll.src) {  
+            Write-Host "Copying from SDK: $($dll.src)"  
+            copy $dll.src dist\  
           } else {  
-            Write-Host "WARNING: $dll not found - skipping"  
+            Write-Host "SDK DLL not found: $($dll.src), trying vcpkg..."  
+            $vcpkgDll = $vcpkgDlls | Where-Object { $_.name -eq $dll.name }  
+            if ($vcpkgDll -and (Test-Path $vcpkgDll.src)) {  
+              Write-Host "Copying from vcpkg: $($vcpkgDll.src)"  
+              copy $vcpkgDll.src dist\  
+            } else {  
+              Write-Host "WARNING: $($dll.name) not found in SDK or vcpkg - skipping"  
+            }  
           }  
+        }  
+          
+        # Verificar se temos pelo menos algumas DLLs essenciais  
+        $essentialDlls = @("lua51.dll", "libxml2.dll")  
+        $foundEssential = 0  
+        foreach ($essential in $essentialDlls) {  
+          if (Test-Path "dist\$essential") {  
+            $foundEssential++  
+          }  
+        }  
+          
+        if ($foundEssential -eq 0) {  
+          Write-Host "WARNING: No essential DLLs found. Server may not run properly."  
+        } else {  
+          Write-Host "Found $foundEssential essential DLLs. Package should be functional."  
         }  
           
     - name: Upload Artifact  
