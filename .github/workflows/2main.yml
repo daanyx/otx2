@@ -1,26 +1,65 @@
-name: Build OTX Server 2 (Source Build)  
-  
-on:  
-  push:  
-    branches: [ main, master ]  
-  
-jobs:  
-  build:  
-    runs-on: windows-latest  
-      
-    steps:  
-    - name: Checkout code  
-      uses: actions/checkout@v4  
-        
-    - name: Cache Boost  
-      id: cache-boost  
-      uses: actions/cache@v3  
-      with:  
-        path: C:\local\boost_1_84_0  
-        key: boost-1.84.0-msvc-14.3-x64  
+name: 01Build OTX Server    
+on: [push, pull_request]    
+    
+jobs:    
+  build:    
+    runs-on: windows-latest    
+    steps:    
+      - uses: actions/checkout@v4    
           
-    - name: Build Boost from Source  
-      if: steps.cache-boost.outputs.cache-hit != 'true'  
-      run: |  
-        # Download and build Boost 1.84.0  
-        # (script para compilar do código fonte)
+      - name: Cache Boost    
+        uses: actions/cache@v4    
+        id: cache-boost    
+        with:    
+          path: |    
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3    
+            C:\local\boost_1_84_0    
+          key: boost-1.84.0-msvc-14.3-${{ runner.os }}    
+            
+      - name: Install Boost via Chocolatey    
+        if: steps.cache-boost.outputs.cache-hit != 'true'    
+        run: |    
+          choco install boost-msvc-14.3 --version=1.84.0 -y    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
+          if (!(Test-Path "C:\local\boost_1_84_0")) {    
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
+          }    
+        shell: powershell    
+          
+      - name: Create Boost symlink (if cached)    
+        if: steps.cache-boost.outputs.cache-hit == 'true'    
+        run: |    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
+          if (!(Test-Path "C:\local\boost_1_84_0")) {    
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
+          }    
+        shell: powershell    
+            
+      - name: Cache MSBuild objects    
+        uses: actions/cache@v4    
+        with:    
+          path: |    
+            sources/msvc/x64    
+            sources/msvc/*.tlog    
+          key: msbuild-cache-${{ runner.os }}-${{ hashFiles('sources/**/*.cpp', 'sources/**/*.h') }}    
+          restore-keys: |    
+            msbuild-cache-${{ runner.os }}-    
+                
+      - name: Setup MSBuild    
+        uses: microsoft/setup-msbuild@v2    
+            
+      - name: Build    
+        run: msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m    
+  
+      - name: Prepare artifacts  
+        run: |  
+          mkdir artifact-staging  
+          copy sources\msvc\x64\Release\*.exe artifact-staging\  
+          copy sources\msvc\x64\Release\*.dll artifact-staging\ 2>nul || echo "No DLL files found"  
+        shell: cmd  
+            
+      - name: Upload Artifact    
+        uses: actions/upload-artifact@v4    
+        with:    
+          name: otx-server-build    
+          path: artifact-staging/
