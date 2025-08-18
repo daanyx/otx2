@@ -1,0 +1,39 @@
+name: XXBuild OTX Server 2  
+  
+on: [push, pull_request]  
+  
+jobs:  
+  build-windows:  
+    runs-on: windows-latest  
+    steps:  
+    - uses: actions/checkout@v3  
+      
+    - name: Setup MSBuild  
+      uses: microsoft/setup-msbuild@v1  
+      
+    - name: Download and Install Boost 1.84.0  
+      run: |  
+        Invoke-WebRequest -Uri "https://sourceforge.net/projects/boost/files/boost-binaries/1.84.0/boost_1_84_0-msvc-14.3-64.exe/download" -OutFile "boost_installer.exe"  
+        Start-Process -FilePath "boost_installer.exe" -ArgumentList "/S", "/D=C:\local\boost_1_84_0" -Wait  
+      
+    - name: Build x64 Release  
+      run: |  
+        cd sources/msvc  
+        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64  
+  
+  build-linux:  
+    runs-on: ubuntu-latest  
+    steps:  
+    - uses: actions/checkout@v3  
+      
+    - name: Install dependencies  
+      run: |  
+        sudo apt-get update  
+        sudo apt-get install -y libxml2-dev liblua5.1-dev libmysqlclient-dev \  
+                               libsqlite3-dev libboost-all-dev libssl-dev \  
+                               libtcmalloc-minimal4  
+      
+    - name: Build  
+      run: |  
+        cd sources  
+        make -j$(nproc)
