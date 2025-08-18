@@ -1,4 +1,4 @@
-name: Build OTX Server  
+name: xxxBuild OTX Server  
 on: [push, pull_request]  
   
 jobs:  
@@ -9,8 +9,13 @@ jobs:
         
       - name: Download Boost 1.84.0  
         run: |  
-          Invoke-WebRequest -Uri "https://sourceforge.net/projects/boost/files/boost-binaries/1.84.0/boost_1_84_0-msvc-14.3-64.exe/download" -OutFile "boost.exe"  
-          Start-Process -FilePath "boost.exe" -ArgumentList "/S", "/D=C:\local\boost_1_84_0" -Wait  
+          try {  
+            Invoke-WebRequest -Uri "https://sourceforge.net/projects/boost/files/boost-binaries/1.84.0/boost_1_84_0-msvc-14.3-64.exe/download" -OutFile "boost.exe" -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"  
+            Start-Process -FilePath "boost.exe" -ArgumentList "/S", "/D=C:\local\boost_1_84_0" -Wait  
+          } catch {  
+            Write-Error "Failed to download Boost: $_"  
+            exit 1  
+          }  
         shell: powershell  
         
       - name: Setup MSBuild  
