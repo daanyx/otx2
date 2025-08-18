@@ -1,278 +1,68 @@
-name: 🎮 Build OTX Server 2 - Tibia Emulator  
+name: xxxBuild OTX Server  
 on:   
   push:  
     branches: [ main, develop ]  
   pull_request:  
     branches: [ main ]  
   
-env:  
-  BOOST_VERSION: "1.84.0"  
-  MSVC_VERSION: "14.3"  
-  BUILD_START_TIME: ${{ github.event.head_commit.timestamp }}  
-  
 jobs:  
   build:  
-    name: 🔨 Build & Package OTX Server  
     runs-on: windows-latest  
     strategy:  
       matrix:  
-        include:  
-          - configuration: Release  
-            platform: x64  
-            emoji: "🚀"  
-            color: "green"  
-          - configuration: Debug  
-            platform: x64  
-            emoji: "🐛"  
-            color: "yellow"  
+        configuration: [Release]  
+        platform: [x64]  
       
     steps:  
-      - name: 📥 Checkout Repository  
+      - name: Checkout  
         uses: actions/checkout@v4  
           
-      - name: 🕒 Set Build Start Time  
-        run: |  
-          Write-Host "⏰ Build iniciado em: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"  
-          echo "BUILD_START_TIME=$(Get-Date)" >> $env:GITHUB_ENV  
-        shell: powershell  
-          
-      - name: 💾 Cache Boost Libraries  
+      - name: Cache Boost  
         uses: actions/cache@v4  
         id: cache-boost  
         with:  
           path: |  
             C:\ProgramData\chocolatey\lib\boost-msvc-14.3  
             C:\local\boost_1_84_0  
-          key: boost-${{ env.BOOST_VERSION }}-msvc-${{ env.MSVC_VERSION }}-choco-${{ runner.os }}  
-          restore-keys: |  
-            boost-${{ env.BOOST_VERSION }}-msvc-${{ env.MSVC_VERSION }}-choco-  
-            boost-${{ env.BOOST_VERSION }}-msvc-  
-              
-      - name: 🍫 Install Boost via Chocolatey  
+          key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}  
+            
+      - name: Install Boost via Chocolatey  
         if: steps.cache-boost.outputs.cache-hit != 'true'  
         run: |  
-          Write-Host "🎯 === INSTALANDO BOOST C++ LIBRARIES ===" -ForegroundColor Cyan  
-          Write-Host "🔽 Baixando Boost ${{ env.BOOST_VERSION }} via Chocolatey..." -ForegroundColor Yellow  
-            
-          try {  
-            choco install boost-msvc-14.3 --version=${{ env.BOOST_VERSION }} -y --no-progress  
-            Write-Host "✅ Boost instalado com sucesso!" -ForegroundColor Green  
-          } catch {  
-            Write-Host "❌ Erro na instalação do Boost: $_" -ForegroundColor Red  
-            throw  
-          }  
-            
-          Write-Host "📁 Configurando estrutura de diretórios..." -ForegroundColor Cyan  
-          if (!(Test-Path "C:\local")) {   
-            New-Item -ItemType Directory -Path "C:\local"   
-            Write-Host "📂 Diretório C:\local criado" -ForegroundColor Green  
-          }  
-            
+          choco install boost-msvc-14.3 --version=1.84.0 -y  
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
           if (!(Test-Path "C:\local\boost_1_84_0")) {  
             New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
-            Write-Host "🔗 Link simbólico criado para Boost" -ForegroundColor Green  
           }  
-            
-          Write-Host "🎉 Boost configurado e pronto para uso!" -ForegroundColor Green  
         shell: powershell  
           
-      - name: 🔍 Verify Build Environment  
+      - name: Verify Build Environment  
         run: |  
-          Write-Host "🔧 === VERIFICAÇÃO DO AMBIENTE DE BUILD ===" -ForegroundColor Cyan  
-          Write-Host ""  
-            
-          # Verificar Boost  
-          $boostStatus = if (Test-Path 'C:\local\boost_1_84_0') { "✅ ENCONTRADO" } else { "❌ AUSENTE" }  
-          Write-Host "📦 Boost Path: $boostStatus" -ForegroundColor $(if ($boostStatus -like "*ENCONTRADO*") { "Green" } else { "Red" })  
-            
-          $libsStatus = if (Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3') { "✅ ENCONTRADO" } else { "❌ AUSENTE" }  
-          Write-Host "📚 Boost Libs: $libsStatus" -ForegroundColor $(if ($libsStatus -like "*ENCONTRADO*") { "Green" } else { "Red" })  
-            
-          # Informações do sistema  
-          Write-Host "🖥️ Sistema: Windows ${{ runner.os }}" -ForegroundColor Cyan  
-          Write-Host "🏗️ Configuração: ${{ matrix.configuration }}" -ForegroundColor Cyan  
-          Write-Host "🎯 Plataforma: ${{ matrix.platform }}" -ForegroundColor Cyan  
-            
-          Write-Host "🛠️ MSBuild Version:" -ForegroundColor Cyan  
+          Write-Host "=== Build Environment ==="  
+          Write-Host "Boost Path: $(Test-Path 'C:\local\boost_1_84_0')"  
+          Write-Host "Boost Libs: $(Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3')"  
+          Write-Host "MSBuild Version:"  
           msbuild -version  
-            
-          Write-Host ""  
-          Write-Host "✨ Ambiente verificado e pronto para build!" -ForegroundColor Green  
         shell: powershell  
           
-      - name: ⚙️ Setup MSBuild  
+      - name: Setup MSBuild  
         uses: microsoft/setup-msbuild@v2  
           
-      - name: ${{ matrix.emoji }} Build OTX Server (${{ matrix.configuration }})  
+      - name: Build OTX Server  
         run: |  
-          Write-Host "🚀 === INICIANDO COMPILAÇÃO DO OTX SERVER 2 ===" -ForegroundColor Cyan  
-          Write-Host "📋 Configuração: ${{ matrix.configuration }}" -ForegroundColor Yellow  
-          Write-Host "🎯 Plataforma: ${{ matrix.platform }}" -ForegroundColor Yellow  
-          Write-Host "🔨 Compilador: MSVC ${{ env.MSVC_VERSION }}" -ForegroundColor Yellow  
-          Write-Host ""  
-            
-          $startTime = Get-Date  
-          Write-Host "⏰ Início da compilação: $($startTime.ToString('HH:mm:ss'))" -ForegroundColor Cyan  
-            
-          try {  
-            msbuild sources/msvc/TheOTXServer.vcxproj `  
-              /p:Configuration=${{ matrix.configuration }} `  
-              /p:Platform=${{ matrix.platform }} `  
-              /m `  
-              /v:minimal `  
-              /p:WarningLevel=1 `  
-              /p:TreatWarningsAsErrors=false  
-                
-            $endTime = Get-Date  
-            $duration = $endTime - $startTime  
-              
-            Write-Host ""  
-            Write-Host "🎉 === COMPILAÇÃO CONCLUÍDA COM SUCESSO! ===" -ForegroundColor Green  
-            Write-Host "⏱️ Tempo de compilação: $($duration.ToString('mm\:ss'))" -ForegroundColor Green  
-            Write-Host "✅ OTX Server 2 compilado com sucesso!" -ForegroundColor Green  
-          } catch {  
-            Write-Host "❌ Erro na compilação: $_" -ForegroundColor Red  
-            throw  
-          }  
+          msbuild sources/msvc/TheOTXServer.vcxproj `  
+            /p:Configuration=${{ matrix.configuration }} `  
+            /p:Platform=${{ matrix.platform }} `  
+            /m `  
+            /v:minimal `  
+            /p:WarningLevel=1  
         shell: powershell  
           
-      - name: 🧪 Run Build Tests & Validation  
-        run: |  
-          Write-Host "🔍 === VALIDAÇÃO DO BUILD ===" -ForegroundColor Cyan  
-            
-          $exePath = "sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.exe"  
-            
-          if (Test-Path $exePath) {  
-            $fileInfo = Get-Item $exePath  
-            $sizeInMB = [math]::Round($fileInfo.Length / 1MB, 2)  
-              
-            Write-Host "✅ Executável encontrado!" -ForegroundColor Green  
-            Write-Host "📦 Tamanho: $sizeInMB MB" -ForegroundColor Cyan  
-            Write-Host "📅 Data de criação: $($fileInfo.CreationTime)" -ForegroundColor Cyan  
-              
-            # Verificar dependências DLL  
-            Write-Host "📚 Verificando dependências DLL..." -ForegroundColor Cyan  
-            try {  
-              $deps = dumpbin /dependents $exePath 2>$null | Select-String "\.dll" | Select-Object -First 10  
-              if ($deps) {  
-                Write-Host "🔗 Principais dependências encontradas:" -ForegroundColor Green  
-                $deps | ForEach-Object { Write-Host "   - $($_.Line.Trim())" -ForegroundColor Gray }  
-              }  
-            } catch {  
-              Write-Host "⚠️ Não foi possível verificar dependências DLL" -ForegroundColor Yellow  
-            }  
-              
-            Write-Host "✅ Validação concluída com sucesso!" -ForegroundColor Green  
-          } else {  
-            Write-Host "❌ Executável não encontrado em: $exePath" -ForegroundColor Red  
-            throw "Build falhou - executável não foi gerado"  
-          }  
-        shell: powershell  
-          
-      - name: 📊 Build Metrics & Statistics  
-        run: |  
-          Write-Host "📈 === MÉTRICAS DO BUILD ===" -ForegroundColor Cyan  
-            
-          $buildEndTime = Get-Date  
-          $totalDuration = $buildEndTime - [DateTime]$env:BUILD_START_TIME  
-            
-          Write-Host "⏱️ Duração total do build: $($totalDuration.ToString('mm\:ss'))" -ForegroundColor Yellow  
-            
-          $exePath = "sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.exe"  
-          if (Test-Path $exePath) {  
-            $exeSize = [math]::Round((Get-Item $exePath).Length / 1MB, 2)  
-            Write-Host "📦 Tamanho do executável: $exeSize MB" -ForegroundColor Yellow  
-          }  
-            
-          Write-Host "🔧 Compilador: MSVC ${{ env.MSVC_VERSION }}" -ForegroundColor Yellow  
-          Write-Host "📚 Boost Version: ${{ env.BOOST_VERSION }}" -ForegroundColor Yellow  
-          Write-Host "🎯 Configuração: ${{ matrix.configuration }}" -ForegroundColor Yellow  
-          Write-Host "🏗️ Plataforma: ${{ matrix.platform }}" -ForegroundColor Yellow  
-          Write-Host "🖥️ Runner OS: ${{ runner.os }}" -ForegroundColor Yellow  
-            
-          Write-Host ""  
-          Write-Host "📊 Estatísticas salvas para relatório!" -ForegroundColor Green  
-        shell: powershell  
-          
-      - name: 📦 Upload Build Artifacts  
+      - name: Upload Artifacts  
         uses: actions/upload-artifact@v4  
         with:  
-          name: 🎯 OTXServer-${{ matrix.configuration }}-${{ matrix.platform }}-${{ github.sha }}  
+          name: TheOTXServer-${{ matrix.configuration }}-${{ matrix.platform }}  
           path: |  
-            sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.exe  
-            sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.pdb  
-          retention-days: 30  
-            
-      - name: 📋 Generate Build Report  
-        if: always()  
-        run: |  
-          Write-Host "📝 Gerando relatório detalhado do build..." -ForegroundColor Cyan  
-            
-          $status = if (${{ job.status }} -eq "success") { "✅ SUCESSO" } else { "❌ FALHA" }  
-          $exePath = "sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.exe"  
-          $exeExists = Test-Path $exePath  
-          $exeSize = if ($exeExists) { [math]::Round((Get-Item $exePath).Length / 1MB, 2) } else { "N/A" }  
-            
-          $report = @"  
-          # 🎮 OTX Server 2 - Build Report  
-            
-          ## 📊 Informações do Build  
-          - **Status**: $status  
-          - **Configuração**: ${{ matrix.configuration }} ${{ matrix.emoji }}  
-          - **Plataforma**: ${{ matrix.platform }}  
-          - **Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})  
-          - **Branch**: ${{ github.ref_name }}  
-          - **Trigger**: ${{ github.event_name }}  
-            
-          ## 🔧 Ambiente de Build  
-          - **Boost Version**: ${{ env.BOOST_VERSION }}  
-          - **MSVC Version**: ${{ env.MSVC_VERSION }}  
-          - **Runner OS**: ${{ runner.os }}  
-          - **Cache Hit**: ${{ steps.cache-boost.outputs.cache-hit }}  
-            
-          ## 📦 Artefatos Gerados  
-          $(if ($exeExists) {  
-            "- ✅ TheOTXServer.exe ($exeSize MB)"  
-          } else {  
-            "- ❌ TheOTXServer.exe (Falha na compilação)"  
-          })  
-          $(if (Test-Path "sources/msvc/x64/${{ matrix.configuration }}/TheOTXServer.pdb") {  
-            "- ✅ TheOTXServer.pdb (Símbolos de debug)"  
-          } else {  
-            "- ❌ TheOTXServer.pdb (Não gerado)"  
-          })  
-            
-          ## 🔗 Links Úteis  
-          - [📊 Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})  
-          - [📁 Repository](${{ github.server_url }}/${{ github.repository }})  
-          - [📋 Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})  
-            
-          ---  
-          *Relatório gerado automaticamente em $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')*  
-          "@  
-            
-          $report | Out-File -FilePath "build-report-${{ matrix.configuration }}.md" -Encoding UTF8  
-          Write-Host "📄 Relatório salvo como build-report-${{ matrix.configuration }}.md" -ForegroundColor Green  
-        shell: powershell  
-  
-      - name: 📤 Upload Build Report  
-        uses: actions/upload-artifact@v4  
-        if: always()  
-        with:  
-          name: 📋 BuildReport-${{ matrix.configuration }}-${{ matrix.platform }}  
-          path: build-report-${{ matrix.configuration }}.md  
-          retention-days: 90  
-            
-      - name: 🚀 Prepare Release Package  
-        if: github.ref == 'refs/heads/main' && matrix.configuration == 'Release'  
-        run: |  
-          Write-Host "📦 === CRIANDO PACOTE DE RELEASE ===" -ForegroundColor Cyan  
-            
-          New-Item -ItemType Directory -Path "release-package" -Force  
-            
-          # Copiar executável principal  
-          Copy-Item "sources/msvc/x64/Release/TheOTXServer.exe" "release-package/"  
-          Write-Host "✅ Executável copiado" -ForegroundColor Green  
-            
-          # Copiar arquivos de configuração se existirem  
-          $configFiles = @("config.lua
+            sources/msvc/x64/Release/TheOTXServer.exe  
+            sources/msvc/x64/Release/TheOTXServer.pdb  
+          retention-days: 30
