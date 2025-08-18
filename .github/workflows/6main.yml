@@ -24,49 +24,49 @@ jobs:
           key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}    
               
       - name: 🍫 Install Boost via Chocolatey    
-        if: steps.cache-boost.outputs.cache-hit != 'true'    
-        run: |    
-          Write-Host "Instalando Boost 1.84.0..." -ForegroundColor Yellow  
-          choco install boost-msvc-14.3 --version=1.84.0 -y    
-            
-          Write-Host "Verificando instalacao do Boost..." -ForegroundColor Cyan  
-            
-          # Verificar onde o Boost foi instalado  
-          $boostLibPath = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Directory | Where-Object { $_.Name -like "*boost*" }  
-            
-          if ($boostLibPath) {  
-            Write-Host "Boost encontrado em: $($boostLibPath.FullName)" -ForegroundColor Green  
-              
-            # Lista de possíveis caminhos onde o Boost pode estar  
-            $possiblePaths = @(  
-              Join-Path $boostLibPath.FullName "tools",  
-              $boostLibPath.FullName  
-            )  
-              
-            $foundPath = $null  
-            foreach ($path in $possiblePaths) {  
-              if (Test-Path $path) {  
-                $foundPath = $path  
-                Write-Host "Boost encontrado em: $path" -ForegroundColor Green  
-                break  
-              }  
-            }  
-              
-            Write-Host "Configurando diretorios..." -ForegroundColor Cyan  
-            if (!(Test-Path "C:\local")) {   
-              New-Item -ItemType Directory -Path "C:\local"   
-            }  
-              
-            if ($foundPath -and !(Test-Path "C:\local\boost_1_84_0")) {  
-              New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target $foundPath  
-              Write-Host "Link simbolico criado: C:\local\boost_1_84_0 -> $foundPath" -ForegroundColor Green  
-            }  
-          } else {  
-            throw "Boost nao encontrado apos instalacao"  
-          }  
-            
-          Write-Host "Boost configurado com sucesso!" -ForegroundColor Green  
-        shell: powershell    
+  if: steps.cache-boost.outputs.cache-hit != 'true'    
+  run: |    
+    Write-Host "Instalando Boost 1.84.0..." -ForegroundColor Yellow  
+    choco install boost-msvc-14.3 --version=1.84.0 -y    
+      
+    Write-Host "Verificando instalacao do Boost..." -ForegroundColor Cyan  
+      
+    # Verificar onde o Boost foi instalado - pegar apenas o primeiro resultado  
+    $boostLibPath = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Directory | Where-Object { $_.Name -like "*boost*" } | Select-Object -First 1  
+      
+    if ($boostLibPath) {  
+      Write-Host "Boost encontrado em: $($boostLibPath.FullName)" -ForegroundColor Green  
+        
+      # Lista de possíveis caminhos onde o Boost pode estar  
+      $possiblePaths = @(  
+        (Join-Path $boostLibPath.FullName "tools"),  
+        $boostLibPath.FullName  
+      )  
+        
+      $foundPath = $null  
+      foreach ($path in $possiblePaths) {  
+        if (Test-Path $path) {  
+          $foundPath = $path  
+          Write-Host "Boost encontrado em: $path" -ForegroundColor Green  
+          break  
+        }  
+      }  
+        
+      Write-Host "Configurando diretorios..." -ForegroundColor Cyan  
+      if (!(Test-Path "C:\local")) {   
+        New-Item -ItemType Directory -Path "C:\local"   
+      }  
+        
+      if ($foundPath -and !(Test-Path "C:\local\boost_1_84_0")) {  
+        New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target $foundPath  
+        Write-Host "Link simbolico criado: C:\local\boost_1_84_0 -> $foundPath" -ForegroundColor Green  
+      }  
+    } else {  
+      throw "Boost nao encontrado apos instalacao"  
+    }  
+      
+    Write-Host "Boost configurado com sucesso!" -ForegroundColor Green  
+  shell: powershell
             
       - name: ⚙️ Setup MSBuild    
         uses: microsoft/setup-msbuild@v2    
