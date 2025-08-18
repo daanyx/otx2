@@ -32,16 +32,15 @@ jobs:
       - name: 🔗 Create Boost Symlink      
   if: steps.cache-boost.outputs.cache-hit == 'true'      
   run: |      
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8  
-    Write-Host "♻️ Using cached Boost libraries..."  
+    echo "[CACHE] Using cached Boost libraries..."  
     if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }      
     if (!(Test-Path "C:\local\boost_1_84_0")) {      
       New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"      
     }      
-    Write-Host "✅ Boost symlink created!"  
+    echo "[OK] Boost symlink created!"  
   shell: powershell      
               
-      - name: 💾 Cache MSBuild Objects      
+      - name: 💾 Cache MSBuild Objects
         uses: actions/cache@v4      
         with:      
           path: |      
