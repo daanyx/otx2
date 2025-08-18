@@ -5,7 +5,7 @@ jobs:
   build-windows-x64:  
     runs-on: windows-latest  
     steps:  
-      - uses: actions/checkout@v3  
+      - uses: actions/checkout@v4  
         
       - name: Install Chocolatey  
         run: |  
@@ -30,7 +30,7 @@ jobs:
         run: msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64  
           
       - name: Upload Executable Artifact  
-        uses: actions/upload-artifact@v3  
+        uses: actions/upload-artifact@v4  
         with:  
           name: TheOTXServer-x64  
           path: sources/msvc/x64/Release/TheOTXServer.exe
