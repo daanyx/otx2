@@ -1,68 +1,68 @@
 name: xxxBuild OTX Server  
-on:   
-  push:  
-    branches: [ main, develop ]  
-  pull_request:  
-    branches: [ main ]  
-  
-jobs:  
-  build:  
-    runs-on: windows-latest  
-    strategy:  
-      matrix:  
-        configuration: [Release]  
-        platform: [x64]  
-      
-    steps:  
-      - name: Checkout  
-        uses: actions/checkout@v4  
-          
-      - name: Cache Boost  
-        uses: actions/cache@v4  
-        id: cache-boost  
-        with:  
-          path: |  
-            C:\ProgramData\chocolatey\lib\boost-msvc-14.3  
-            C:\local\boost_1_84_0  
-          key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}  
+on:     
+  push:    
+    branches: [ main, develop ]    
+  pull_request:    
+    branches: [ main ]    
+    
+jobs:    
+  build:    
+    runs-on: windows-latest    
+    strategy:    
+      matrix:    
+        configuration: [Release]    
+        platform: [x64]    
+        
+    steps:    
+      - name: Checkout    
+        uses: actions/checkout@v4    
             
-      - name: Install Boost via Chocolatey  
-        if: steps.cache-boost.outputs.cache-hit != 'true'  
-        run: |  
-          choco install boost-msvc-14.3 --version=1.84.0 -y  
-          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
-          if (!(Test-Path "C:\local\boost_1_84_0")) {  
-            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
-          }  
-        shell: powershell  
-          
-      - name: Verify Build Environment  
-        run: |  
-          Write-Host "=== Build Environment ==="  
-          Write-Host "Boost Path: $(Test-Path 'C:\local\boost_1_84_0')"  
-          Write-Host "Boost Libs: $(Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3')"  
-          Write-Host "MSBuild Version:"  
-          msbuild -version  
-        shell: powershell  
-          
-      - name: Setup MSBuild  
-        uses: microsoft/setup-msbuild@v2  
-          
-      - name: Build OTX Server  
-        run: |  
-          msbuild sources/msvc/TheOTXServer.vcxproj `  
-            /p:Configuration=${{ matrix.configuration }} `  
-            /p:Platform=${{ matrix.platform }} `  
-            /m `  
-            /v:minimal `  
-            /p:WarningLevel=1  
-        shell: powershell  
-          
-      - name: Upload Artifacts  
-        uses: actions/upload-artifact@v4  
-        with:  
-          name: TheOTXServer-${{ matrix.configuration }}-${{ matrix.platform }}  
-          path: |  
-            sources/msvc/x64/Release/TheOTXServer.exe  
-            sources/msvc/x64/Release/TheOTXServer.pdb  
+      - name: Cache Boost    
+        uses: actions/cache@v4    
+        id: cache-boost    
+        with:    
+          path: |    
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3    
+            C:\local\boost_1_84_0    
+          key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}    
+              
+      - name: Install Boost via Chocolatey    
+        if: steps.cache-boost.outputs.cache-hit != 'true'    
+        run: |    
+          choco install boost-msvc-14.3 --version=1.84.0 -y    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }    
+          if (!(Test-Path "C:\local\boost_1_84_0")) {    
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"    
+          }    
+        shell: powershell    
+            
+      - name: Setup MSBuild    
+        uses: microsoft/setup-msbuild@v2    
+            
+      - name: Verify Build Environment    
+        run: |    
+          Write-Host "=== Build Environment ==="    
+          Write-Host "Boost Path: $(Test-Path 'C:\local\boost_1_84_0')"    
+          Write-Host "Boost Libs: $(Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3')"    
+          Write-Host "MSBuild Version:"    
+          msbuild -version    
+        shell: powershell    
+            
+      - name: Build OTX Server    
+        run: |    
+          msbuild sources/msvc/TheOTXServer.vcxproj `    
+            /p:Configuration=${{ matrix.configuration }} `    
+            /p:Platform=${{ matrix.platform }} `    
+            /m `    
+            /v:minimal `    
+            /p:WarningLevel=1    
+        shell: powershell    
+            
+      - name: Upload Artifacts    
+        uses: actions/upload-artifact@v4    
+        with:    
+          name: TheOTXServer-${{ matrix.configuration }}-${{ matrix.platform }}    
+          path: |    
+            sources/msvc/x64/Release/TheOTXServer.exe    
+            sources/msvc/x64/Release/TheOTXServer.pdb    
           retention-days: 30
