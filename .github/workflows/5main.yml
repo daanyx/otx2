@@ -1,38 +1,59 @@
-name: XBuild OTX Server 2  
+name: XBuild OTX Server 2 - Windows x64  
   
 on: [push, pull_request]  
   
 jobs:  
-  build-windows:  
+  build-windows-x64:  
     runs-on: windows-latest  
     steps:  
-    - uses: actions/checkout@v3  
+    - uses: actions/checkout@v4  
       
     - name: Setup MSBuild  
-      uses: microsoft/setup-msbuild@v1  
+      uses: microsoft/setup-msbuild@v2  
+      
+    - name: Cache Boost  
+      uses: actions/cache@v4  
+      id: cache-boost  
+      with:  
+        path: C:\local\boost_1_84_0  
+        key: boost-1.84.0-msvc-14.3-x64  
       
     - name: Install Boost via Chocolatey  
+      if: steps.cache-boost.outputs.cache-hit != 'true'  
       run: |  
         choco install boost-msvc-14.3 --version=1.84.0 -y  
+      
+    - name: Cache MSBuild  
+      uses: actions/cache@v4  
+      with:  
+        path: |  
+          sources/msvc/x64  
+          sources/msvc/*.pdb  
+        key: msbuild-${{ hashFiles('sources/msvc/**/*.vcxproj', 'sources/**/*.cpp', 'sources/**/*.h') }}  
+        restore-keys: |  
+          msbuild-  
       
     - name: Build x64 Release  
       run: |  
         cd sources/msvc  
-        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64  
-  
-  build-linux:  
-    runs-on: ubuntu-latest  
-    steps:  
-    - uses: actions/checkout@v3  
+        msbuild TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\build\ /m  
       
-    - name: Install dependencies  
+    - name: Collect DLLs  
       run: |  
-        sudo apt-get update  
-        sudo apt-get install -y libxml2-dev liblua5.1-dev libmysqlclient-dev \  
-                               libsqlite3-dev libboost-all-dev libssl-dev \  
-                               libtcmalloc-minimal4  
+        mkdir artifacts  
+        # Copiar executável  
+        copy build\TheOTXServer.exe artifacts\  
+          
+        # Copiar DLLs do Boost  
+        copy "C:\local\boost_1_84_0\lib64-msvc-14.3\*.dll" artifacts\ 2>nul || echo "No Boost DLLs found"  
+          
+        # Copiar DLLs do sistema (se necessário)  
+        copy "C:\Windows\System32\msvcp*.dll" artifacts\ 2>nul || echo "No MSVC runtime DLLs needed"  
+        copy "C:\Windows\System32\vcruntime*.dll" artifacts\ 2>nul || echo "No VC runtime DLLs needed"  
       
-    - name: Build  
-      run: |  
-        cd sources  
-        make -j$(nproc)
+    - name: Upload Artifacts  
+      uses: actions/upload-artifact@v4  
+      with:  
+        name: otx-server-2-windows-x64  
+        path: artifacts/  
+        retention-days: 30
