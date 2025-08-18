@@ -1,129 +1,77 @@
-name: 🏗️ Build OTX Server - Release x64  
-on:     
-  push:    
-    branches: [ main, develop ]    
-  pull_request:    
-    branches: [ main ]    
-    
-jobs:    
-  build:    
-    name: 🚀 Build Release x64  
+name: 🏗️ Build OTX Server  
+on: [push, pull_request]  
+  
+jobs:  
+  build:  
     runs-on: windows-latest  
-        
-    steps:    
-      - name: 📥 Checkout Repository  
-        uses: actions/checkout@v4    
+    steps:  
+      - name: 📥 Checkout Code  
+        uses: actions/checkout@v4  
+          
+      - name: 📊 Build Status  
+        run: echo "::notice title=Build Started::🚀 Starting OTX Server build process"  
+          
+      - name: 🚀 Cache Boost  
+        uses: actions/cache@v4  
+        id: cache-boost  
+        with:  
+          path: |  
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3  
+            C:\local\boost_1_84_0  
+          key: boost-1.84.0-msvc-14.3-${{ runner.os }}  
             
-      - name: 💾 Cache Boost Libraries  
-        uses: actions/cache@v4    
-        id: cache-boost    
-        with:    
-          path: |    
-            C:\ProgramData\chocolatey\lib\boost-msvc-14.3*  
-            C:\local\boost_1_84_0    
-          key: boost-1.84.0-msvc-14.3-choco-${{ runner.os }}    
-              
-      - name: 🍫 Install Boost via Chocolatey    
-  if: steps.cache-boost.outputs.cache-hit != 'true'    
-  run: |    
-    Write-Host "Instalando Boost 1.84.0..." -ForegroundColor Yellow  
-    choco install boost-msvc-14.3 --version=1.84.0 -y    
-      
-    Write-Host "Verificando instalacao do Boost..." -ForegroundColor Cyan  
-      
-    # Verificar onde o Boost foi instalado - pegar apenas o primeiro resultado  
-    $boostLibPath = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Directory | Where-Object { $_.Name -like "*boost*" } | Select-Object -First 1  
-      
-    if ($boostLibPath) {  
-      Write-Host "Boost encontrado em: $($boostLibPath.FullName)" -ForegroundColor Green  
-        
-      # Lista de possíveis caminhos onde o Boost pode estar  
-      $possiblePaths = @(  
-        (Join-Path $boostLibPath.FullName "tools"),  
-        $boostLibPath.FullName  
-      )  
-        
-      $foundPath = $null  
-      foreach ($path in $possiblePaths) {  
-        if (Test-Path $path) {  
-          $foundPath = $path  
-          Write-Host "Boost encontrado em: $path" -ForegroundColor Green  
-          break  
-        }  
-      }  
-        
-      Write-Host "Configurando diretorios..." -ForegroundColor Cyan  
-      if (!(Test-Path "C:\local")) {   
-        New-Item -ItemType Directory -Path "C:\local"   
-      }  
-        
-      if ($foundPath -and !(Test-Path "C:\local\boost_1_84_0")) {  
-        New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target $foundPath  
-        Write-Host "Link simbolico criado: C:\local\boost_1_84_0 -> $foundPath" -ForegroundColor Green  
-      }  
-    } else {  
-      throw "Boost nao encontrado apos instalacao"  
-    }  
-      
-    Write-Host "Boost configurado com sucesso!" -ForegroundColor Green  
-  shell: powershell
-            
-      - name: ⚙️ Setup MSBuild    
-        uses: microsoft/setup-msbuild@v2    
-            
-      - name: 🔍 Verify Build Environment    
-        run: |    
-          Write-Host "=== Build Environment Check ===" -ForegroundColor Cyan  
-          Write-Host "Boost Path: $(if (Test-Path 'C:\local\boost_1_84_0') { 'OK' } else { 'MISSING' })"    
-          Write-Host "Boost Libs: $(if (Test-Path 'C:\local\boost_1_84_0\lib64-msvc-14.3') { 'OK' } else { 'MISSING' })"    
-          Write-Host "MSBuild Version:" -ForegroundColor Cyan  
-          msbuild -version    
-          Write-Host "Environment ready!" -ForegroundColor Green  
-        shell: powershell    
-            
-      - name: 🚀 Build OTX Server (Release x64)  
-        run: |    
-          Write-Host "Compilando OTX Server em Release x64..." -ForegroundColor Yellow  
-          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m /v:minimal /p:WarningLevel=1  
-          Write-Host "Compilacao concluida!" -ForegroundColor Green  
-        shell: powershell    
-            
-      - name: 🧪 Validate Build Output  
+      - name: 📦 Install Boost via Chocolatey  
+        if: steps.cache-boost.outputs.cache-hit != 'true'  
         run: |  
-          Write-Host "=== VALIDACAO DO BUILD ===" -ForegroundColor Cyan  
-            
-          $exePath = "sources/msvc/x64/Release/TheOTXServer.exe"  
-            
-          if (Test-Path $exePath) {  
-            $fileInfo = Get-Item $exePath  
-            $sizeInMB = [math]::Round($fileInfo.Length / 1MB, 2)  
-              
-            Write-Host "Executavel encontrado!" -ForegroundColor Green  
-            Write-Host "Tamanho: $sizeInMB MB" -ForegroundColor Cyan  
-            Write-Host "Data de criacao: $($fileInfo.CreationTime)" -ForegroundColor Cyan  
-            Write-Host "Build validado com sucesso!" -ForegroundColor Green  
-          } else {  
-            Write-Host "Executavel nao encontrado em: $exePath" -ForegroundColor Red  
-            throw "Build falhou - executavel nao foi gerado"  
+          echo "::group::📦 Installing Boost"  
+          choco install boost-msvc-14.3 --version=1.84.0 -y  
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
+          if (!(Test-Path "C:\local\boost_1_84_0")) {  
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
+          }  
+          echo "::endgroup::"  
+        shell: powershell  
+          
+      - name: 🔗 Create Boost symlink (if cached)  
+        if: steps.cache-boost.outputs.cache-hit == 'true'  
+        run: |  
+          echo "::notice::📦 Using cached Boost libraries"  
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }  
+          if (!(Test-Path "C:\local\boost_1_84_0")) {  
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"  
           }  
         shell: powershell  
             
-      - name: 📦 Upload Release Artifacts  
-        uses: actions/upload-artifact@v4    
-        with:    
-          name: 🎯 OTXServer-Release-x64-${{ github.sha }}  
-          path: |    
-            sources/msvc/x64/Release/TheOTXServer.exe    
-            sources/msvc/x64/Release/TheOTXServer.pdb    
-          retention-days: 30  
-  
-      - name: 📊 Build Summary  
-        if: success()  
+      - name: 🗂️ Cache MSBuild objects  
+        uses: actions/cache@v4  
+        with:  
+          path: |  
+            sources/msvc/x64  
+            sources/msvc/*.tlog  
+          key: msbuild-cache-${{ runner.os }}-${{ hashFiles('sources/**/*.cpp', 'sources/**/*.h') }}  
+          restore-keys: |  
+            msbuild-cache-${{ runner.os }}-  
+                
+      - name: 🔧 Setup MSBuild  
+        uses: microsoft/setup-msbuild@v2  
+            
+      - name: 🏗️ Build OTX Server  
         run: |  
-          Write-Host "=== BUILD SUCCESSFUL ===" -ForegroundColor Green  
-          Write-Host "Artifact: OTXServer-Release-x64-${{ github.sha }}" -ForegroundColor Cyan  
-          $exeSize = [math]::Round((Get-Item 'sources/msvc/x64/Release/TheOTXServer.exe').Length / 1MB, 2)  
-          Write-Host "Size: $exeSize MB" -ForegroundColor Cyan  
-          Write-Host "Build completed at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Cyan  
-          Write-Host "Ready for deployment!" -ForegroundColor Green  
-        shell: powershell
+          echo "::group::🏗️ Building OTX Server"  
+          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m  
+          echo "::endgroup::"  
+        shell: powershell  
+            
+      - name: ⬆️ Upload Build Artifact  
+        uses: actions/upload-artifact@v4  
+        with:  
+          name: 🎯-otx-server-build  
+          path: sources/msvc/x64/Release/  
+            
+      - name: ✅ Build Success  
+        if: success()  
+        run: echo "::notice title=Success::🎉 OTX Server build completed successfully!"  
+          
+      - name: ❌ Build Failure  
+        if: failure()  
+        run: echo "::error title=Failed::💥 Build failed. Check the logs above for details."
