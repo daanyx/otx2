@@ -1,4 +1,4 @@
-name: XXBuild OTX Server 2  
+name: XBuild OTX Server 2  
   
 on: [push, pull_request]  
   
@@ -11,10 +11,9 @@ jobs:
     - name: Setup MSBuild  
       uses: microsoft/setup-msbuild@v1  
       
-    - name: Download and Install Boost 1.84.0  
+    - name: Install Boost via Chocolatey  
       run: |  
-        Invoke-WebRequest -Uri "https://sourceforge.net/projects/boost/files/boost-binaries/1.84.0/boost_1_84_0-msvc-14.3-64.exe/download" -OutFile "boost_installer.exe"  
-        Start-Process -FilePath "boost_installer.exe" -ArgumentList "/S", "/D=C:\local\boost_1_84_0" -Wait  
+        choco install boost-msvc-14.3 --version=1.84.0 -y  
       
     - name: Build x64 Release  
       run: |  
