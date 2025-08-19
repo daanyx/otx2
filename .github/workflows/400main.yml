@@ -1,4 +1,4 @@
-name: 🚀 400Build OTX2 Server        
+name: 🚀 400Build OTX Server        
 on: [push, pull_request]        
         
 jobs:        
@@ -29,7 +29,7 @@ jobs:
           echo "[OK] Boost installation completed!"    
         shell: powershell        
               
-      - name: 🔗 Create Boost        
+      - name: 🔗 Create Boost Symlink        
         if: steps.cache-boost.outputs.cache-hit == 'true'        
         run: |        
           echo "[CACHE] Using cached Boost libraries..."    
@@ -37,10 +37,10 @@ jobs:
           if (!(Test-Path "C:\local\boost_1_84_0")) {        
             New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"        
           }        
-          echo "[OK] Boost created!"    
+          echo "[OK] Boost symlink created!"    
         shell: powershell        
                 
-      - name: 💾 Cache MSBuild        
+      - name: 💾 Cache MSBuild Objects        
         uses: actions/cache@v4        
         with:        
           path: |        
@@ -53,9 +53,9 @@ jobs:
       - name: 🔧 Setup MSBuild        
         uses: microsoft/setup-msbuild@v2        
                 
-      - name: 🏗️ Build OTX2 Server        
+      - name: 🏗️ Build OTX Server        
         run: |    
-          echo "[BUILD] Starting OTX2 Server compilation..."    
+          echo "[BUILD] Starting OTX Server compilation..."    
           msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m    
           echo "[OK] Build completed successfully!"    
         shell: powershell    
@@ -75,13 +75,13 @@ jobs:
           path: artifact-staging/    
     
       - name: 🎉 Build Success Notification    
-  if: success()    
-  run: |    
-    echo "[SUCCESS] OTX Server build completed successfully!"    
-    echo "[INFO] Compiled on: $(Get-Date -Format 'dd MMM yyyy, HH:mm:ss')"  
-    echo "[INFO] Artifact: otx-server-build"    
-    echo "[INFO] Download your build from the Actions tab"    
-  shell: powershell    
+        if: success()    
+        run: |    
+          echo "[SUCCESS] OTX Server build completed successfully!"    
+          echo "[INFO] Compiled on: $(Get-Date -Format 'dd MMM yyyy, HH:mm:ss')"  
+          echo "[INFO] Artifact: otx-server-build"    
+          echo "[INFO] Download your build from the Actions tab"    
+        shell: powershell    
     
       - name: ❌ Build Failure Notification      
         if: failure()    
