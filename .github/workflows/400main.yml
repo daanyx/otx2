@@ -75,14 +75,13 @@ jobs:
           path: artifact-staging/    
     
       - name: 🎉 Build Success Notification    
-        if: success()    
-        run: |    
-          $timestamp = Get-Date -Format "dd MMM yyyy, HH:mm:ss"  
-          echo "[SUCCESS] OTX Server build completed successfully!"    
-          echo "[INFO] Compiled on: $timestamp"  
-          echo "[INFO] Artifact: otx-server-build"    
-          echo "[INFO] Download your build from the Actions tab"    
-        shell: powershell    
+  if: success()    
+  run: |    
+    echo "[SUCCESS] OTX Server build completed successfully!"    
+    echo "[INFO] Compiled on: $(Get-Date -Format 'dd MMM yyyy, HH:mm:ss')"  
+    echo "[INFO] Artifact: otx-server-build"    
+    echo "[INFO] Download your build from the Actions tab"    
+  shell: powershell    
     
       - name: ❌ Build Failure Notification      
         if: failure()    
