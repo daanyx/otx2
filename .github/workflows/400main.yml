@@ -1,0 +1,92 @@
+name: 🚀 400Build OTX2 Server        
+on: [push, pull_request]        
+        
+jobs:        
+  build:        
+    runs-on: windows-latest        
+    steps:        
+      - name: 📥 Checkout Code    
+        uses: actions/checkout@v4        
+              
+      - name: 🗂️ Cache Boost        
+        uses: actions/cache@v4        
+        id: cache-boost        
+        with:        
+          path: |        
+            C:\ProgramData\chocolatey\lib\boost-msvc-14.3        
+            C:\local\boost_1_84_0        
+          key: boost-1.84.0-msvc-14.3-${{ runner.os }}        
+                
+      - name: 📦 Install Boost       
+        if: steps.cache-boost.outputs.cache-hit != 'true'        
+        run: |        
+          echo "[INSTALL] Installing Boost libraries..."    
+          choco install boost-msvc-14.3 --version=1.84.0 -y        
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }        
+          if (!(Test-Path "C:\local\boost_1_84_0")) {        
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"        
+          }        
+          echo "[OK] Boost installation completed!"    
+        shell: powershell        
+              
+      - name: 🔗 Create Boost        
+        if: steps.cache-boost.outputs.cache-hit == 'true'        
+        run: |        
+          echo "[CACHE] Using cached Boost libraries..."    
+          if (!(Test-Path "C:\local")) { New-Item -ItemType Directory -Path "C:\local" }        
+          if (!(Test-Path "C:\local\boost_1_84_0")) {        
+            New-Item -ItemType SymbolicLink -Path "C:\local\boost_1_84_0" -Target "C:\ProgramData\chocolatey\lib\boost-msvc-14.3\tools"        
+          }        
+          echo "[OK] Boost created!"    
+        shell: powershell        
+                
+      - name: 💾 Cache MSBuild        
+        uses: actions/cache@v4        
+        with:        
+          path: |        
+            sources/msvc/x64        
+            sources/msvc/*.tlog        
+          key: msbuild-cache-${{ runner.os }}-${{ hashFiles('sources/**/*.cpp', 'sources/**/*.h') }}        
+          restore-keys: |        
+            msbuild-cache-${{ runner.os }}-        
+                    
+      - name: 🔧 Setup MSBuild        
+        uses: microsoft/setup-msbuild@v2        
+                
+      - name: 🏗️ Build OTX2 Server        
+        run: |    
+          echo "[BUILD] Starting OTX2 Server compilation..."    
+          msbuild sources/msvc/TheOTXServer.vcxproj /p:Configuration=Release /p:Platform=x64 /m    
+          echo "[OK] Build completed successfully!"    
+        shell: powershell    
+      
+      - name: 📋 Prepare Artifacts      
+        run: |      
+          echo [PREPARE] Preparing build artifacts...    
+          mkdir artifact-staging      
+          copy sources\msvc\x64\Release\*.exe artifact-staging\      
+          echo [OK] Artifacts prepared!    
+        shell: cmd      
+                
+      - name: ⬆️ Upload Artifact        
+        uses: actions/upload-artifact@v4        
+        with:        
+          name: 🎯 otx-server-build        
+          path: artifact-staging/    
+    
+      - name: 🎉 Build Success Notification    
+        if: success()    
+        run: |    
+          $timestamp = Get-Date -Format "dd MMM yyyy, HH:mm:ss"  
+          echo "[SUCCESS] OTX Server build completed successfully!"    
+          echo "[INFO] Compiled on: $timestamp"  
+          echo "[INFO] Artifact: otx-server-build"    
+          echo "[INFO] Download your build from the Actions tab"    
+        shell: powershell    
+    
+      - name: ❌ Build Failure Notification      
+        if: failure()    
+        run: |    
+          echo "[FAILED] BUILD FAILED! Please check the logs above for errors."    
+          echo "[HELP] Common issues: Missing dependencies, compilation errors"    
+        shell: powershell
